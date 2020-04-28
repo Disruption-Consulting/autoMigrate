@@ -4,16 +4,24 @@ Automate the migration of NON-CDB Oracle databases versions 10 through 12 into P
 OVERVIEW
 --------
 This project attempts to unify the various methods available for migrating Oracle databases into the Multitenant architecture. 
-Database migrations are generally complex projects involving dozens of steps executed on both source and target systems. Selecting an optimal migration method depends on a number of factors, including version and size of the database being migrated, its availability during the migration as well as any cross platform requirements.
+Database migrations are generally complex projects often involving dozens of steps executed on both source and target systems. Selecting an optimal migration method depends on a number of factors, including version and size of the database being migrated, its availability during the migration as well as any cross platform requirements and network capacity.
 
 This project aims to reduce a cross-platform migration to a minimum of interventions, involving a preparation script on the source database and an execution script on the target database. Where business needs demand minimum downtime, a third intervention on the source database is required to finalize the process.
 
 BACKGROUND
 ----------
-Starting with Oracle version 20, the NON-CDB architecture is no longer supported. However, most production Oracle landscapes include at least some version 10, 11 and 12 databases. With increasing emphasis on reducing the enterprise cost of IT infrastructure, there is a growing need to simplify the process of database migration. This project was motivated by the need to migrate some 40 Production Oracle databases, versions 10 through 12 running on AIX to version 19 PDBs running on Linux RHEL. The announcement (November, 2019) by Oracle that 3 PDBs may now run license-free per version 19 CDB is further motivation to deliver a more automated migration process.
+Starting with Oracle v20, the NON-CDB architecture is no longer supported. However, most production Oracle landscapes include at least some v12, v11 and even v10 databases. With increasing emphasis on reducing the enterprise cost of IT infrastructure, there is a growing need to simplify the process of database migration. This project was motivated by the need to migrate some 40 Production Oracle databases, versions 10 through 12 running on AIX to v19 PDBs running on Linux RHEL (nb. v19 is terminal release offering the longest extended support period). 
+
+The announcement (November, 2019) that 3 PDBs may now run license-free per v19 CDB is further motivation to deliver a more automated migration process.
 
 DESCRIPTION:
 ------------
+With cross platform transportable tablespace becoming available starting with v10, Oracle database migration has become a simpler process, if only in the sense that migration choices became more limited. The advent of Datapump in v9 to replace the antiquated exp/imp utilities has further simplified the available toolset. 
+
+What this means is that unless you want to change the database characterset, you can now move physical tablespace datafiles instead of logically exporting/importing table rows between source and target. However, this addresses only the need to migrate data segments (tables, indexes, clusters); it does not include metadata like PLSQL packages, views, sequences and other schema objects.
+
+Starting with v 11.2.0.3 it is now possible to migrate both tablespaces and metadata in a single datapump operation. This is called Transportable Database and is a tremendous productivity boon. Prior to v 11.2.0.3 there is Transportable Tablespace which covers the migration of data segments but does not cater for metadata.
+
 
 Migrations with this utility involve at some stage placing all of the source database application tablespaces into read only mode. 
 This is a pre-requisite of transportable tablespace whereby data movement is fast and physical (database blocks) rather than slow and logical (table rows).
