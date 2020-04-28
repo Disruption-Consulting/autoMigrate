@@ -35,21 +35,25 @@ mode=RESET-TS
   Use this following a successful migration in order to set tablespaces back to their former status.
 
 mode=RESET
-  Remove all trace of the operation of this script from the database.
+  Remove all objects created by this script from the database - i.e. schema SNFTRANSFER and various directories depending
+  on whether the INCR-TS mode had been run
   
 mode=INCR-TS
   For use when the database requires maximum availability throughout the migration. 
-  Application data changes are continuously backed up in a background job and restored to a maintained copy on the target database.
+  Application data changes are continuously backed up in a background job and restored to a maintained copy 
+  on the target database.
                      
 mode=INCR-TS-FINAL
-  Sets all tablespaces to read only ensuring that after the next incremental backup is applied, the source and target databases will be consistent.
-
+  Sets all tablespaces to read only ensuring that when the next incremental backup is applied, the source and target 
+  databases will be consistent. This automatically triggers the metadata integration process on the source database.
+  
                      
 (2)                         
 incr-ts-dir=directory-path
   Directory where backups of application datafiles are created prior to being transported to the target database server.
-  Needs at least as much capacity as the existing database.
-                         
+  Needs at least as much capacity as the existing database. 
+  
+  
 (3)
 incr-ts-freq="freq=hourly; byminute=0; bysecond=0;"
   Frequency with which the background dbms_scheduler job will execute in order to create incremental backups.
@@ -60,3 +64,35 @@ incr-ts-freq="freq=hourly; byminute=0; bysecond=0;"
   
 OPERATING NOTES
 ---------------
+Both mode=EXECUTE and mode=INCR-TS creates
+
+  USER: SNFTRANSFER  - granted system privileges - SELECT ANY DICTIONARY, DATAPUMP_EXP_FULL_DATABASE
+
+
+In the case of mode=INCR-TS
+---------------------------
+The following objects are created to automate migration by incremental backup:
+
+  TABLE: INCR_TS
+    - maintains the next SCN to be used for each application tablespace datafile
+ 
+  PROCEDURE: P_INCR_TS
+    - run by the MIGRATION_INCR job to create file image copies of all application tablespace datafiles
+    - creates incremental backups of datafiles according to next SCN
+    
+  JOB: MIGRATION_INCR
+    - runs according to selected frequency and executes procedure P_INCR_TS
+    
+  DIRECTORY: AIX_INCR_TS_DIR
+    - based on directory defined when running the "aix_migr.sql" script
+    - needs to have capacity to hold copies of at least all application database datafiles
+    
+  GRANT: EXECUTE ON SYS.DBMS_BACKUP_RESTORE
+    - File image coies and incremental backups are performed using the internal API for RMAN
+    
+  
+In the case of mode=EXECUTE
+---------------------------
+  DIRECTORIES : AIX_FILES_n_DIR
+    - A directory is created for each distinct directory path holding Application tablespace datafiles.
+    - Required for file transber by DBMS_FILE_TRANSFER
