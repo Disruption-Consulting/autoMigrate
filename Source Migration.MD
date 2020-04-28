@@ -10,11 +10,15 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
 
 RUN COMMAND                         
 -----------
-                         
+              
+```
 sqlplus / as sysdba @aix_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET-TS|INCR-TS|INCR-TS-FINAL] \
     incr-ts-dir=directory-path \
     incr-ts-freq="freq=hourly; byminute=0; bysecond=0;"
+```
+
+
                          
 PARAMETERS (3):
 ---------------           
