@@ -38,11 +38,11 @@ UNIX_GROUP_NAME=oinstall
 # This is an optional parameter if installing on
 # Windows based Operating System.
 #-------------------------------------------------------------------------------
-INVENTORY_LOCATION=/opt/oracle/oradata/oraInventory
+INVENTORY_LOCATION=/u01/app/oraInventory
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Home. 
 #-------------------------------------------------------------------------------
-ORACLE_HOME=/opt/oracle/product/19.0.0/dbhome_1
+ORACLE_HOME=/u01/oracle/product/19.0.0/dbhome_1
 
 #-------------------------------------------------------------------------------
 # Specify the complete path of the Oracle Base. 
