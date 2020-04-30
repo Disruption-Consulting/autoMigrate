@@ -29,14 +29,16 @@ mode=ANALYZE
   
 mode=EXECUTE
   Prepares the migration based on an optimal transportable tablespace method determined by database version. 
-  Recommended for small databases (<500GB) where downtime of approx. half a day is acceptable (depending on network capacity and reliability).
+  Recommended for small databases (<500GB) where downtime of approx. half a day is acceptable (depending on network capacity
+  and reliability).
 
 mode=RESET-TS
   Use this following a successful migration in order to set tablespaces back to their former status.
 
-mode=RESET
+mode=REMOVE
   Remove all objects created by this script from the database - i.e. schema SNFTRANSFER and various directories depending
-  on whether the INCR-TS mode had been run
+  on whether the INCR-TS mode had been run. Additionally, all backups are deleted if the application had previously been 
+  running incremental backups
   
 mode=INCR-TS
   For use when the database requires maximum availability throughout the migration. 
@@ -66,30 +68,23 @@ OPERATING NOTES
 ---------------
 Both mode=EXECUTE and mode=INCR-TS creates
 
-  USER: SNFTRANSFER  - granted system privileges - SELECT ANY DICTIONARY, DATAPUMP_EXP_FULL_DATABASE
-
-
+  USER: SNFTRANSFER  
+  PACKAGE: PCK_MIGRATION_SRC
+  
 In the case of mode=INCR-TS
 ---------------------------
 The following objects are created to automate migration by incremental backup:
 
   TABLE: INCR_TS
     - maintains the next SCN to be used for each application tablespace datafile
- 
-  PROCEDURE: P_INCR_TS
-    - run by the MIGRATION_INCR job to create file image copies of all application tablespace datafiles
-    - creates incremental backups of datafiles according to next SCN
     
   JOB: MIGRATION_INCR
-    - runs according to selected frequency and executes procedure P_INCR_TS
+    - runs according to the defined schedule (default is on the hour every hour). Executes PCK_MIGRATION_SRC.INCR_TS
     
-  DIRECTORY: AIX_INCR_TS_DIR
-    - based on directory defined when running the "aix_migr.sql" script
+  DIRECTORY: AIX_FILES_1_DIR
+    - references the OS directory defined with the INCR-TS-DIR parameter
     - needs to have capacity to hold copies of at least all application database datafiles
-    
-  GRANT: EXECUTE ON SYS.DBMS_BACKUP_RESTORE
-    - File image coies and incremental backups are performed using the internal API for RMAN
-    
+
   
 In the case of mode=EXECUTE
 ---------------------------
