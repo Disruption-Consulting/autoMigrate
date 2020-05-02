@@ -1,34 +1,8 @@
-
-|AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
-|---|--|--|
-||src_migr MODE=EXECUTE||
-|:stop_sign:|*start downtime*|| 
-|:stop_sign:||tgt_migr|
-|:stop_sign:|| **transfer**|
-|:stop_sign:|| **datapump**|
-|:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
-
-
-Where business needs demand that application downtime be minimized, then the following alternative migration steps can be followed:
-
-|SOURCE DATABASE|TARGET DATABASE|
-|--|--|
-|aix_migr MODE=INCR-TS||
-|*available*|| 
-||rhel_migr|
-|| **transfer**|
-|aix_migr MODE=INCR-TS-FINAL||
-|*start downtime*||
-||**final transfer**|
-||*datapump*|
-| aix_migr MODE=RESET||
-| *end downtime*||
-
 INSTALLATION
 ------------
-The installation comprises only one script file, "rhel_migr.sql". 
+The installation comprises only one script file, "tgt_migr.sql". 
 
-Logon (or sudo) to "oracle" software owner, although any account that belongs to "dba" group and has sysdba
+Logon (or sudo) to "oracle" software owner, although any account that belongs to the "dba" group and therefore has sysdba
 privilege can run this script.
 
 Place the script on a suitable filesystem - it only generates a few bytes of informational output.
@@ -106,6 +80,34 @@ For example, if the source database is relatively small and the business can tol
 
 
 
+|AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
+|:---:|--|--|
+||`sqlplus / @src_migr MODE=EXECUTE`||
+|:stop_sign:||`sqlplus / @tgt_migr`|
+|:stop_sign:|| **transfer**|
+|:stop_sign:|| **datapump**|
+|:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
+
+
+Where business needs demand that application downtime be minimized during the migration, then the following alternative steps can be followed:
+
+|AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
+|:---:|--|--|
+||`sqlplus / @src_migr MODE=INCR-TS`||
+|:white_check_mark:||`sqlplus / @tgt_migr`|
+|:white_check_mark:|**backup**|**transfer**|
+|:white_check_mark:|**backup**|**transfer**|
+|:white_check_mark:|**backup**|**transfer**|
+||`sqlplus / @src_migr MODE=INCR-TS-FINAL`||
+|:stop_sign:|**final backup**| **final transfer**|
+|:stop_sign:|| **datapump**|
+|:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
+
+In this way, the application remains available throughout the migration until the end when a final backup and transfer trigger the datapump integration step. A job that runs by default every hour is launched on both the source and target databases which takes image backups of all application tablespace data files followed by incremantal block change backups. The corresponding job on the target database transfers these files until it recognizes that a final backup has been taken which it applies before starting the normal datapump integration to complete the migration.
+
+PROGRESS MONITORING
+-------------------
+After launching the `tgt_migr` script, the sqlplus session remains open. Submitting "/" will show progress of the migration.
 
 
 
