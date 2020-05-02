@@ -38,38 +38,30 @@ PARAMETERS:
   Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
 
 *`START=[PDB|TRANSFER]`*
-    *`PDB`* - starts by creating the new target PDB (DEFAULT)
-    *`TRANSFER`* - starts the process by transferring data files from the source database. Use, for example, to restart after
-                   network failure interrupted a previous run.
+- *`PDB`* - starts by creating the new target PDB (DEFAULT)
+- *`TRANSFER`* - starts the process by transferring data files from the source database. Use, for example, to restart after network failure interrupted a previous run.
 
-*`MIGRATE=[CONV-DB|XTTS-TS`*
-  Forces migration by FULL import - i.e. logical data export/import instead of file transfer.
-  Originally intended as a solution for changing characterset to AL32UTF8 (the default for CDB). 
-  NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
-  
-*`MIGRATE=XTTS-TS`*
-  Forces migration by TRANSPORTABLE TABLESPACE - only for me to test as I don't have Oracle 10 (or 11 for that matter).
+*`MIGRATE=[CONV-DB|XTTS-TS]`*
+- *`CONV`* - forces migration by FULL logical export/import. Thought it was a good idea in case use wanted to change characterset. NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
+- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE - only for me to test as I don't have Oracle 10 (or 11 for that matter).
 
-(7)
-*`ACTION=FORCE-STOP`*
-  Forces a running MIGRATION_JOB to be stopped before relaunching. E.g. for use when previous transfer run interrupted by network failure
-
-*`ACTION=DEL-UNPLUG`*
-  If deleting PDB on a re-run, will delete any tablespace data files that have been transferred but not plugged in
+*`ACTION=[FORCE-STOP|DEL-UNPLUG]`*
+- *`FORCE-STOP`*  - forces the damn MIGRATION_JOB to be stopped immediately
+- *`DEL-UNPLUG`* - If deleting PDB on a re-run, will delete any tablespace data files that have been transferred but not plugged in
 
 
 OPERATING NOTES
 ---------------
-Once the source database has been prepared - `sqlplus / @src_migr.sql`, running this script on the destination server (e.g. RHEL) will migrate the source database into a new PDB named according to the PDBNAME parameter.
+Running`sqlplus / @tgt_migr.sql` starts migrating the source database into a new PDB named according to the PDBNAME parameter.
 
-The other script parameters (USER, HOST, SERVICE) are used to create a DATABASE LINK within the PDB that connects to the source database. This DB LINK is central to the migration and performs the following major tasks:
+The script parameters USER, HOST and SERVICE are used to create a DATABASE LINK that connects to the source database. This DB LINK is central to the migration which commprises 2 main steps:
 
-1) transfer application tablespace data files from the source database
+1) transfer application tablespace data files from the source database (converting endianness if necessary).
 2) integrate these into the PDB along with application metadata.
 
-The integration step uses the DATAPUMP transportable tablespace feature, hence **ALL** application tablespaces must be set to READ ONLY on the source database prior to the migration. This is done by running the `src_migr.sql` script either with MODE=EXECUTE or MODE=INCR-TS. This effects only how the data is transferred; the final integration step is identical.
+The integration step uses DATAPUMP transportable tablespace, hence **ALL** application tablespaces must be set to READ ONLY on the source database prior to the integration step. For all but the smallest databases, the majority of time taken in a migration will be the time spent transferring data; for example, with an effective network bandwith of 100Gb/hour it will take approxiamately 6 hours to migrate a 500GB database (including 1 hour for metadata integration). 
 
-With MODE=EXECUTE, source application tablespaces are immediately set to READ ONLY. Running the `tgt_migr` script then transfers the data files before completing the migration. Depending on network capacity and the volume of data to be transferred, this could take, for example approximately 6 hours to completely migrate a 500GB database on an effective bandwidth of 100GB/hour (including time to import metadata and generate database statistics).
+In the schematic below, running src_migr MODE=EXECUTE immediately sets all tablespaces to READ ONLY, effectively making the application inaccessible until the migration is complete. Running the `tgt_migr` script then transfers the data files before completing the migration. 
 
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|
@@ -82,11 +74,11 @@ With MODE=EXECUTE, source application tablespaces are immediately set to READ ON
 
 Where critical applications need to be available almost 24hours/day with only a small window of a few hours available to complete the migration, then clearly large databases cannot be migrated using the method described above. For example, a 2TB database would take almost a complete day to migrate using the direct method. Moreover, there is no risk mitigation in case of network failure. 
 
-Therefore, the automigrate utility offers migration as a series of incremental source database backups that are continuously applied to the target until an appointed cut-over time.
+Therefore, the automigrate utility offers migration as a series of incremental source database backups that are continuously applied to the target until an appointed cut-over time. Until that time, the application remains available. 
 
-Running `src_migr MODE=INCR-TS` launches a background job which takes image copies of all data files comprising application tablespaces and subsequently at intervals (default is every hour) takes backups of incremental changes only. A corresponding job on the target database automatically recognizes this mode of migration and transfers the image copies together with their incremental backups at the same interval as the source migration job. The incremental backups are applied to the image copies until a third and final intervention on the source database - runnning `src_migr MODE=INCR-TS-FINAL` sets application tablespaces to READ ONLY before taking a final incremental backup.
+Running `src_migr MODE=INCR-TS` launches a background job which takes image copies of all data files comprising application tablespaces and subsequently, at defined intervals, takes backups of incremental changes only. A corresponding job on the target database automatically recognizes this mode of migration and transfers the image copies together with their incremental backups at the same interval as the source migration job (default is every hour). The incremental backups are applied to the image copies until a third and final intervention on the source database - runnning `src_migr MODE=INCR-TS-FINAL` sets application tablespaces to READ ONLY before taking a final incremental backup.
 
-When the corresponding migration job on the target database next runs, it recognizes that all source tablespaces have been set to READ ONLY and starts the DATAPUMP integration process automatically after applying the final incremental backup. In this way, the source database is completely transferred.
+When the corresponding migration job next runs on the target database it recognizes that all source tablespaces have been set to READ ONLY and starts the DATAPUMP integration process automatically after applying the final incremental backup. In this way, the source database is completely transferred and is consistent with the new target.
 
 
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
@@ -101,11 +93,10 @@ When the corresponding migration job on the target database next runs, it recogn
 |:stop_sign:|| **datapump**|
 |:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
 
-In this way, the application remains available throughout the migration until the end when a final backup and transfer trigger the datapump integration step. A job that runs by default every hour is launched on both the source and target databases which takes image backups of all application tablespace data files followed by incremantal block change backups. The corresponding job on the target database transfers these files until it recognizes that a final backup has been taken which it applies before starting the normal datapump integration to complete the migration.
 
 PROGRESS MONITORING
 -------------------
-After launching the `tgt_migr` script, the sqlplus session remains open. Submitting "/" will show progress of the migration.
+After launching the `tgt_migr` script, the sqlplus session remains open; entering "/" shows progress of the migration on the screen. Data transfer progress is displayed first before details of the datapump integration. 
 
 
 
