@@ -12,7 +12,7 @@ RUN COMMAND
 -----------
               
 ```
-sqlplus / as sysdba @rhel_migr.sql \
+sqlplus / as sysdba @tgt_migr.sql \
     USER=SNFTRANSFER \
     HOST=xxxxxxxxxxx \
     SERVICE=ssssssss \
@@ -24,61 +24,59 @@ sqlplus / as sysdba @rhel_migr.sql \
 PARAMETERS (7):
 ---------------           
 (1)           
-USER   
+`USER`   
   Default is "SNFTRANSFER" - this is the user created on source database that we use to create a global database link
   through which we access data and metadata on the source database.
 
 (2)
-HOST
+`HOST`
   Name of the server hosting the source database.
 
 (3)
-SERVICE
+`SERVICE`
   Name of the service running on the source database that is registered with the local listener. We use these first 3 
   items to create the database link.
 
 (4)
-PDBNAME
+`PDBNAME`
   Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
 
 (5)
-START=PDB
+*`START=PDB`*
   Start the process by creating a new PDB (DEFAULT)
 
-START=TRANSFER 
+*`START=TRANSFER`* 
   Start the process by transferring data files from the source database. Once complete will run the datapump migration.
 
 (6)
-MIGRATE=CONV-DB
+*`MIGRATE=CONV-DB`*
   Forces migration by FULL import - i.e. logical data export/import instead of file transfer.
   Originally intended as a solution for changing characterset to AL32UTF8 (the default for CDB). 
   NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
   
-MIGRATE=XTTS-TS
+*`MIGRATE=XTTS-TS`*
   Forces migration by TRANSPORTABLE TABLESPACE - only for me to test as I don't have Oracle 10 (or 11 for that matter).
 
 (7)
-ACTION=FORCE-STOP
+*`ACTION=FORCE-STOP`*
   Forces a running MIGRATION_JOB to be stopped before relaunching. E.g. for use when previous transfer run interrupted by network failure
 
-ACTION=DEL-UNPLUG
+*`ACTION=DEL-UNPLUG`*
   If deleting PDB on a re-run, will delete any tablespace data files that have been transferred but not plugged in
 
 
 OPERATING NOTES
 ---------------
-Once the source database has been prepared (aix_migr.sql), running this script on the destination server (e.g. RHEL) will migrate the source database into a new PDB named according to the PDBNAME script parameter.
+Once the source database has been prepared - `sqlplus / @src_migr.sql`, running this script on the destination server (e.g. RHEL) will migrate the source database into a new PDB named according to the PDBNAME parameter.
 
 The other script parameters (USER, HOST, SERVICE) are used to create a DATABASE LINK within the PDB that connects to the source database. This DB LINK is central to the migration and performs the following major tasks:
 
 1) transfer application tablespace data files from the source database
 2) integrate these into the PDB along with application metadata.
 
-The integration step uses the DATAPUMP transportable tablespace feature, hence all application tablespaces must be set to READ ONLY on the source database prior to the migration. This is done using the "aix_migr.sql" script either by running that script with MODE=EXECUTE or MODE=INCR-TS. Note that this effects only HOW the data is transferred.
+The integration step uses the DATAPUMP transportable tablespace feature, hence **ALL** application tablespaces must be set to READ ONLY on the source database prior to the migration. This is done by running the `src_migr.sql` script either with MODE=EXECUTE or MODE=INCR-TS. This effects only how the data is transferred; the final integration step is identical.
 
-For example, if the source database is relatively small and the business can tolerate a proportionally small period of application downtime, then the following steps will work:
-
-
+With MODE=EXECUTE, source application tablespaces are immediately set to READ ONLY. Running the `tgt_migr` script then transfers the data files before completing the migration. Depending on network capacity and the volume of data to be transferred, this could take, for example approximately 6 hours to completely migrate a 500GB database on an effective bandwidth of 100GB/hour (including time to import metadata and generate database statistics).
 
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|
@@ -89,7 +87,14 @@ For example, if the source database is relatively small and the business can tol
 |:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
 
 
-Where business needs demand that application downtime be minimized during the migration, then the following alternative steps can be followed:
+Where critical applications need to be available almost 24hours/day with only a small window of a few hours available to complete the migration, then clearly large databases cannot be migrated using the method described above. For example, a 2TB database would take almost a complete day to migrate using the direct method. Moreover, there is no risk mitigation in case of network failure. 
+
+Therefore, the automigrate utility offers migration as a series of incremental source database backups that are continuously applied to the target until an appointed cut-over time.
+
+Running `src_migr MODE=INCR-TS` launches a background job which takes image copies of all data files comprising application tablespaces and subsequently at intervals (default is every hour) takes backups of incremental changes only. A corresponding job on the target database automatically recognizes this mode of migration and transfers the image copies together with their incremental backups at the same interval as the source migration job. The incremental backups are applied to the image copies until a third and final intervention on the source database - runnning `src_migr MODE=INCR-TS-FINAL` sets application tablespaces to READ ONLY before taking a final incremental backup.
+
+When the corresponding migration job on the target database next runs, it recognizes that all source tablespaces have been set to READ ONLY and starts the DATAPUMP integration process automatically after applying the final incremental backup. In this way, the source database is completely transferred.
+
 
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|
