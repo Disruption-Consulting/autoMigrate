@@ -78,7 +78,16 @@ The integration step uses the DATAPUMP transportable tablespace feature, hence a
 
 For exaample, if the source database is relatively small and the business can tolerate a proportionally small period of application downtime, then the following steps will work:
 
-SOURCE DATABASE      TARGET DATABASE
+|SOURCE DATABASE        |TARGET DATABASE|
+|-----------------------|---------------|
+| aix_migr MODE=EXECUTE |               |
+| <start downtime>      |               | 
+|                       | rhel_migr     |
+|                       | <transfer>    |
+|                       | <datapump>    |
+| aix_migr MODE=RESET-TS|               |
+| <end downtime>        |               |
+
 
 
 
