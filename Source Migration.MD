@@ -22,9 +22,9 @@ sqlplus / as sysdba @src_migr.sql \
                          
 PARAMETERS:
 -----------                   
-*`mode=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`*   
-  Output details that are pertinent to the migration - e.g. size, tablespaces and their status, tablespace transportability test result. Default if not specified. 
-  Recommended to always start with this.
+*`mode=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`*
+- *`ANALYZE`* - outputs details pertinent to the migration - e.g. size, database name, service name etc. Recommended to always
+start with this.
   
 mode=EXECUTE
   Prepares the migration based on an optimal transportable tablespace method determined by database version. 
