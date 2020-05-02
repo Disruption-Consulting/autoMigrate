@@ -26,33 +26,18 @@ PARAMETERS:
 - *`ANALYZE`* - outputs details pertinent to the migration - e.g. size, database name, service name etc. Recommended to always
 start with this.
   
-mode=EXECUTE
-  Prepares the migration based on an optimal transportable tablespace method determined by database version. 
-  Recommended for small databases (<500GB) where downtime of approx. half a day is acceptable (depending on network capacity
-  and reliability).
+- *`EXECUTE`* - prepares the database for immediate migration. Creates transfer user and sets all application tablespaces to
+READ ONLY.
 
-mode=RESET-TS
-  Use this following a successful migration in order to set tablespaces back to their former status.
+- *`INCR-TS`* - prepares database for migration by a continuous process of taking incremental backups in a background job
+                     
+- *`INCR-TS-FINAL`* - sets all tablespaces to read only before taking a last incremental backup.
+  
+- *`RESET-TS`* - use this following a successful migration in order to set tablespaces back to their former status.
 
-mode=REMOVE
-  Remove all objects created by this script from the database - i.e. schema SNFTRANSFER and various directories depending
-  on whether the INCR-TS mode had been run. Additionally, all backups are deleted if the application had previously been 
-  running incremental backups
-  
-mode=INCR-TS
-  For use when the database requires maximum availability throughout the migration. 
-  Application data changes are continuously backed up in a background job and restored to a maintained copy 
-  on the target database.
-                     
-mode=INCR-TS-FINAL
-  Sets all tablespaces to read only ensuring that when the next incremental backup is applied, the source and target 
-  databases will be consistent. This automatically triggers the metadata integration process on the source database.
-  
-                     
-(2)                         
-incr-ts-dir=directory-path
-  Directory where backups of application datafiles are created prior to being transported to the target database server.
-  Needs at least as much capacity as the existing database. 
+- *`REMOVE`* - removes all objects and backups created by this script from the database
+                           
+*`incr-ts-dir=directory-path`* - Directory where backups of application datafiles are created. Needs at least as much capacity as the existing database. 
   
   
 (3)
