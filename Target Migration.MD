@@ -49,13 +49,10 @@ START=TRANSFER
   Start the process by transferring data files from the source database. Once complete will run the datapump migration.
 
 (6)
-MIGRATE=INCR-TS
-  Initiates the migration by submitting a job to apply incremental backup files trasferred from the source database. 
-
 MIGRATE=CONV-DB
   Forces migration by FULL import - i.e. logical data export/import instead of file transfer.
-  Originally intended as a solution for changing characterset to AL32UTF8 (the default for CDB). However, since 12.2
-  PDBs of any characterset can be plugged into an AL32UTF8 CDB.
+  Originally intended as a solution for changing characterset to AL32UTF8 (the default for CDB). 
+  NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
   
 MIGRATE=XTTS-TS
   Forces migration by TRANSPORTABLE TABLESPACE - only for me to test as I don't have Oracle 10 (or 11 for that matter).
@@ -70,3 +67,22 @@ ACTION=DEL-UNPLUG
 
 OPERATING NOTES
 ---------------
+Once the source database has been prepared (aix_migr.sql), running this script on the destination server (e.g. RHEL) will migrate the source database into a new PDB named according to the PDBNAME script parameter.
+
+The other script parameters (USER, HOST, SERVICE) are used to create a DATABASE LINK within the PDB that connects to the source database. This DB LINK is central to the migration and performs the following major tasks:
+
+1) transfer application tablespace data files from the source database
+2) integrate these into the PDB along with application metadata.
+
+The integration step uses the DATAPUMP transportable tablespace feature, hence all application tablespaces must be set to READ ONLY on the source database prior to the migration. This is done using the "aix_migr.sql" script either by running that script with MODE=EXECUTE or MODE=INCR-TS. Note that this effects only HOW the data is transferred.
+
+For exaample, if the source database is relatively small and the business can tolerate a proportionally small period of application downtime, then the following steps will work:
+
+SOURCE DATABASE      TARGET DATABASE
+
+
+
+
+
+
+
