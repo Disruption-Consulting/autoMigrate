@@ -1,3 +1,29 @@
+
+|SOURCE DATABASE|TARGET DATABASE|
+|--|--|
+|aix_migr MODE=EXECUTE||
+|*start downtime*|| 
+||rhel_migr|
+|| **transfer**|
+|| **datapump**|
+||MIGRATION COMPLETE|
+
+
+Where business needs demand that application downtime be minimized, then the following alternative migration steps can be followed:
+
+|SOURCE DATABASE|TARGET DATABASE|
+|--|--|
+|aix_migr MODE=INCR-TS||
+|*available*|| 
+||rhel_migr|
+|| **transfer**|
+|aix_migr MODE=INCR-TS-FINAL||
+|*start downtime*||
+||**final transfer**|
+||*datapump*|
+| aix_migr MODE=RESET||
+| *end downtime*||
+
 INSTALLATION
 ------------
 The installation comprises only one script file, "rhel_migr.sql". 
@@ -76,17 +102,7 @@ The other script parameters (USER, HOST, SERVICE) are used to create a DATABASE 
 
 The integration step uses the DATAPUMP transportable tablespace feature, hence all application tablespaces must be set to READ ONLY on the source database prior to the migration. This is done using the "aix_migr.sql" script either by running that script with MODE=EXECUTE or MODE=INCR-TS. Note that this effects only HOW the data is transferred.
 
-For exaample, if the source database is relatively small and the business can tolerate a proportionally small period of application downtime, then the following steps will work:
-
-|SOURCE DATABASE|TARGET DATABASE|
-|--|--|
-| aix_migr MODE=EXECUTE||
-| *start downtime*|| 
-||rhel_migr|
-|                       | **transfer**    |
-|                       | **datapump**    |
-| aix_migr MODE=RESET-TS|               |
-| *end downtime*        |               |
+For example, if the source database is relatively small and the business can tolerate a proportionally small period of application downtime, then the following steps will work:
 
 
 
