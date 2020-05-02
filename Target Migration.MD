@@ -1,12 +1,12 @@
 
-|SOURCE DATABASE|TARGET DATABASE|
-|--|--|
-|aix_migr MODE=EXECUTE||
-|*start downtime*|| 
-||rhel_migr|
-|| **transfer**|
-|| **datapump**|
-||MIGRATION COMPLETE|
+|AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
+|---|--|--|
+||src_migr MODE=EXECUTE||
+|:stop_sign:|*start downtime*|| 
+|:stop_sign:||tgt_migr|
+|:stop_sign:|| **transfer**|
+|:stop_sign:|| **datapump**|
+|:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
 
 
 Where business needs demand that application downtime be minimized, then the following alternative migration steps can be followed:
