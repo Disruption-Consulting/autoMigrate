@@ -1,6 +1,6 @@
 INSTALLATION
 ------------
-The installation comprises only one script file, "aix_migr.sql". 
+The installation comprises only one script file, "src_migr.sql". 
 
 Logon (or sudo) to "oracle" software owner, although any account that belongs to "dba" group and has sysdba
 privilege can run this script.
@@ -12,7 +12,7 @@ RUN COMMAND
 -----------
               
 ```
-sqlplus / as sysdba @aix_migr.sql \
+sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET-TS|INCR-TS|INCR-TS-FINAL] \
     incr-ts-dir=directory-path \
     incr-ts-freq="freq=hourly; byminute=0; bysecond=0;"
@@ -20,10 +20,9 @@ sqlplus / as sysdba @aix_migr.sql \
 
 
                          
-PARAMETERS (3):
----------------           
-(1)           
-mode=ANALYZE   
+PARAMETERS:
+-----------                   
+*`mode=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`*   
   Output details that are pertinent to the migration - e.g. size, tablespaces and their status, tablespace transportability test result. Default if not specified. 
   Recommended to always start with this.
   
