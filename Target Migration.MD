@@ -21,35 +21,28 @@ sqlplus / as sysdba @tgt_migr.sql \
 
 
                          
-PARAMETERS (7):
----------------           
-(1)           
+PARAMETERS:
+-----------                   
 `USER`   
-  Default is "SNFTRANSFER" - this is the user created on source database that we use to create a global database link
-  through which we access data and metadata on the source database.
+  Name of user created on source database that we use to create a global database link through which we access data and 
+  metadata on the source database.
 
-(2)
 `HOST`
   Name of the server hosting the source database.
 
-(3)
 `SERVICE`
   Name of the service running on the source database that is registered with the local listener. We use these first 3 
-  items to create the database link.
+  parameters to create the database link.
 
-(4)
 `PDBNAME`
   Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
 
-(5)
-*`START=PDB`*
-  Start the process by creating a new PDB (DEFAULT)
+*`START=[PDB|TRANSFER]`*
+    *`PDB`* - starts by creating the new target PDB (DEFAULT)
+    *`TRANSFER`* - starts the process by transferring data files from the source database. Use, for example, to restart after
+                   network failure interrupted a previous run.
 
-*`START=TRANSFER`* 
-  Start the process by transferring data files from the source database. Once complete will run the datapump migration.
-
-(6)
-*`MIGRATE=CONV-DB`*
+*`MIGRATE=[CONV-DB|XTTS-TS`*
   Forces migration by FULL import - i.e. logical data export/import instead of file transfer.
   Originally intended as a solution for changing characterset to AL32UTF8 (the default for CDB). 
   NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
