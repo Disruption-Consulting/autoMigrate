@@ -1,6 +1,6 @@
 BACKGROUND
 ----------
-V19 is the current terminal release of Oracle Dataase, providing patching support until 2026. 
+V19 is the current terminal release of Oracle Database, providing patching support until 2026. 
 
 V18, by comparison, is an interim release which ends patching support in 2021.
 
