@@ -24,11 +24,10 @@ sqlplus / as sysdba @tgt_migr.sql \
 PARAMETERS:
 -----------                   
 `USER`   
-  Name of user created on source database that we use to create a global database link through which we access data and 
-  metadata on the source database.
+>>Name of user created on source database that we use to create a global database link through which we access data and metadata on the source database.
 
 `HOST`
-  Name of the server hosting the source database.
+>>Name of the server hosting the source database.
 
 `SERVICE`
   Name of the service running on the source database that is registered with the local listener. We use these first 3 
