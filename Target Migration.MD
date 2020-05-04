@@ -14,11 +14,12 @@ RUN COMMAND
 ```
 sqlplus / as sysdba @tgt_migr.sql \
     USER=SNFTRANSFER \
-    HOST=xxxxxxxxxxx \
-    SERVICE=ssssssss \
-    PDBNAME=pppppppp 
+    HOST=10.1.23.124 \
+    SERVICE=WLMPROD \
+    PDBNAME=PDB01 
 ```
 
+Migrates the version database on host 10.1.23.124 listening for service WMLPROD to the current CDB as a new PDB called PDB01.
 
                          
 PARAMETERS:
@@ -33,10 +34,10 @@ PARAMETERS:
 >Name of the service running on the source database that is registered with the local listener. We use these first 3 parameters to create the database link.
 
 `PDBNAME`
-  Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
+>Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
   
 `TMPDIR`
-  OS directory where temporary files created during the migration should be held.
+>OS directory where temporary files created during the migration should be held.
 
 *`START=[PDB|TRANSFER]`*
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
