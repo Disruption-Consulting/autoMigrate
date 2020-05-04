@@ -39,13 +39,13 @@ PARAMETERS:
 *`TMPDIR`*
 >OS directory where temporary files created during the migration should be held.
 
-*`START=[<span style="text-decoration: underline">PDB</span>|TRANSFER]`*
+*`START=[PDB|TRANSFER]`*
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
 - *`TRANSFER`* - starts the process by transferring data files from the source database. Use, for example, to restart after network failure interrupted a previous run.
 
 *`MIGRATE=[CONV-DB|XTTS-TS]`*
-- *`CONV`* - forces migration by FULL logical export/import. Thought it was a good idea in case use wanted to change characterset. NB: Since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
-- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE - only for me to test as I don't have Oracle 10 (or 11 for that matter).
+- *`CONV`* - forces migration by FULL logical export/import. Thought it was a good idea in case user wanted to change characterset - however, since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
+- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
 
 *`ACTION=[FORCE-STOP|DEL-UNPLUG]`*
 - *`FORCE-STOP`*  - forces the damn MIGRATION_JOB to be stopped immediately
