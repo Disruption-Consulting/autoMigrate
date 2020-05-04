@@ -41,15 +41,15 @@ PARAMETERS:
 
 *`START=[PDB|TRANSFER]`*
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
-- *`TRANSFER`* - starts the process by transferring data files from the source database. Use, for example, to restart after network failure interrupted a previous run.
+- *`TRANSFER`* - use if restarting after network failure interrupted a previous run
 
 *`MIGRATE=[CONV-DB|XTTS-TS]`*
-- *`CONV`* - forces migration by FULL logical export/import. Thought it was a good idea in case user wanted to change characterset - however, since 12.2 PDBs of any characterset can be plugged into an AL32UTF8 CDB.
+- *`CONV-DB`* - forces migration by FULL logical export/import. 
 - *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
 
 *`ACTION=[FORCE-STOP|DEL-UNPLUG]`*
 - *`FORCE-STOP`*  - forces the damn MIGRATION_JOB to be stopped immediately
-- *`DEL-UNPLUG`* - If deleting PDB on a re-run, will delete any tablespace data files that have been transferred but not plugged in
+- *`DEL-UNPLUG`* - if a re-run deletes any transferred data files that have not been plugged into the PDB
 
 
 OPERATING NOTES
