@@ -19,7 +19,7 @@ sqlplus / as sysdba @tgt_migr.sql \
     PDBNAME=PDB01 
 ```
 
-Migrates the version database on host 10.1.23.124 listening for service WMLPROD to the current CDB as a new PDB called PDB01.
+Migrates the database on host 10.1.23.124 listening for service WMLPROD to the current CDB as a new PDB called PDB01.
 
                          
 PARAMETERS:
