@@ -36,6 +36,9 @@ PARAMETERS:
 
 `PDBNAME`
   Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
+  
+`TMPDIR`
+  OS directory where temporary files created during the migration should be held.
 
 *`START=[PDB|TRANSFER]`*
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
