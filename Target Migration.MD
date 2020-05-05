@@ -23,7 +23,9 @@ Migrates the database on host 10.1.23.124 listening for service WMLPROD to the c
 
                          
 PARAMETERS:
------------                   
+-----------   
+Parameters listed in `italics` are optional.
+
 `USER`   
 >Name of user created on source database that we use to create a global database link through which we access data and metadata on the source database.
 
@@ -37,7 +39,7 @@ PARAMETERS:
 >Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
   
 *`TMPDIR`*
->OS directory where temporary files created during the migration should be held.
+>OS directory where temporary files created during the migration should be held. Default is `/tmp`
 
 *`START=[PDB|TRANSFER]`*
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
