@@ -21,27 +21,23 @@ PARAMETERS:
 Parameters in `italics` are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`
-- *`ANALYZE`*
->show details about the database - e.g. name and size of database. Should always start with this (DEFAULT)
+- *`ANALYZE`* - show details about the database - e.g. name and size of database. Start with this (DEFAULT)
   
-- *`EXECUTE`*
->prepares database for immediate migration. Creates transfer user and sets tablespaces to read only.
+- *`EXECUTE`* - prepares database for immediate migration - i.e. sets all application tablespaces to read only
 
-- *`INCR-TS`*
->prepares database for migration by a continuous process of taking incremental backups in a background job
+- *`INCR-TS`* - starts migration by taking incremental backups in a background job. Tablespaces remain online
                      
-- *`INCR-TS-FINAL`*
->sets all tablespaces to read only before taking a final incremental backup.
+- *`INCR-TS-FINAL`* - sets all tablespaces to read only before taking a final incremental backup
   
-- *`RESET-TS`*
->use this following a successful migration in order to set tablespaces back to their former status.
+- *`RESET-TS`* - sets tablespaces back to their pre-migration status
 
-- *`REMOVE`*
->remove all objects and backups created by this script from the database
+- *`REMOVE`* - remove all objects and backups created fo the migration
                            
-*`incr-ts-dir`* - OS directory to store backups - must have at least as much capacity as the existing database
+*`incr-ts-dir`*
+>OS directory to store incremental backups - mandatory if `MODE=INCR-TS`
   
-*`incr-ts-freq`* - frequency with which the background job executes in order to create incremental backups
+*`incr-ts-freq`*
+>frequency for taking incremental backups - default is on the hour every hour
 
 
   Surround value in single or double quotes since the parser routine is looking for keyword=value pairs.
