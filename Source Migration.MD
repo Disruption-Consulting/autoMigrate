@@ -81,7 +81,7 @@ sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALE
 #
 ```
 ## Incremental Backup Migration
-Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same database could be migrated as a 3 step process over the course of 6 days during which period it would be fully available to he business. Downtime would be limited to 1 hour on the Saturday.
+Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same database could be migrated as a 3 step process over the course of 6 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
 
 
 1. Start the source database migration job on AIX on Monday:
@@ -102,6 +102,11 @@ ORAENV_ASK=NO
 ORAENV_ASK=YES;
 
 sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=WMLDEV PDBNAME=SALES
+
+# At this point there is a background job on AIX running incremental backups every hour (by default)
+# At the same time there is a corresponding background job on LINUX running at the same frequency 
+# transferring AIX backups and applying them to its local copy of the tablespace datafiles
+# This continues indefinitely until ....
 ```
 
 3. On the following Saturday finalize the migration on AIX:
@@ -114,11 +119,8 @@ ORAENV_ASK=YES;
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
 ```
 
-As far as the business are concerned, their application remains available from Monday through Saturday. During this period incremental backups are automatically taken at a user-defined frequency, transferred and applied automatically to the target database copy. On cut-over day, depending on how frequently backups have been taken, the final backup/apply process may take a very short period to complete.
+As far as the business are concerned, their application remains available from Monday through Saturday. During this period incremental backups are automatically taken at a user-defined frequency, transferred and applied automatically to the target database copy. On cut-over day, depending on how frequently backups have been taken, the final backup/apply process typically takes a very short period to complete.
 
 Step 3 completes the migration in about 1 hour - the time it takes to set the AIX tablespaces to read only, take and apply a final incremental backup and run the DATAPUMP integration job.
 
-**Note that if the SALES database had been 2TB, then the Direct Migration would have taken the best part of 24 hours; an equivalent incremental backup Migration would have taken 1 hour to complete.
-
-
-Note also that DBMS_FILE_TRANSFER is used on the target database to get files from the source database. This ensures that if source and target platforms have different endianness (e.g. big on AIX and little on Linux) then each transferred file is automatically converted as required.
+**Note that if the SALES database had been 2TB, then the Direct Migration would have taken the best part of 24 hours; an equivalent incremental backup Migration would still have taken 1 hour to complete.
