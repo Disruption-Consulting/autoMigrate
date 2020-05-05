@@ -37,17 +37,41 @@ Parameters in `italics` are optional.
 >OS directory to store incremental backups - mandatory if `MODE=INCR-TS`
   
 *`INCR-TS-FREQ`*
->frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS`
+>frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
 
 *`USER`*
 >Name of transfer user. Default is SNFTRANSFER.
 
-see https://oracle-base.com/articles/10g/scheduler-10g for setting *`INCR-TS-FREQ`* E.g.
-*`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
-  
   
 OPERATING NOTES
 ---------------
-Both mode=EXECUTE and INCR-TS create a user (DEFAULT name SNFTRANSFER) which serves as the conduit for the migration. To support the migration, DIRECTORY object(s) are created as well as a table to hold details about SCN number to use for the next incremental backup.
+All migrations with this utility use the Transportable Tablespace feature, which requires that source tablespaces are set to read only before they are copied to the target database and plugged in using DATAPUMP. 
+
+A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. For example, with an effective network transfer rate of 100GB/hour and a 500GB  database it will take about 6 hours to complete the migration, including 1 hour to copy application metadata. In such a case, if the business deems 6 hours' downtime acceptable, then this migration is a simple 2 step process:
+
+1. Run the source database migration script having set its environment, for example:
+
+```
+export ORACLE_SID=SALES
+ORAENV_ASK=NO
+. oraenv
+ORAENV_ASK=YES;
+
+sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
+```
+
+2. Start the target database migration 
+
+```
+export ORACLE_SID=V19CDB
+ORAENV_ASK=NO
+. oraenv
+ORAENV_ASK=YES;
+
+sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=WMLDEV PDBNAME=SALES
+```
+
+However, if application availability is critical to the business and downtime must be limited to 1 hour maximum then 
+
 
 DBMS_FILE_TRANSFER is used on the target database to get files from the source database. This ensures that if source and target platforms have different endianness (e.g. big on AIX and little on Linux) then each transferred file is automatically converted as required.
