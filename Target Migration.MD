@@ -24,10 +24,10 @@ Migrates the database on host 10.1.23.124 listening for service WMLPROD to the c
                          
 PARAMETERS:
 -----------   
-Parameters listed in `italics` are optional.
+Parameters listed in *`italics`* are optional.
 
 `USER`   
->Name of user created on source database that we use to create a global database link through which we access data and metadata on the source database.
+>Name of user created on source database through which we access data and metadata via a db link.
 
 `HOST`
 >Name of the server hosting the source database.
