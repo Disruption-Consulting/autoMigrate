@@ -43,7 +43,7 @@ PARAMETERS:
 - *`PDB`* - starts by creating the new target PDB (DEFAULT)
 - *`TRANSFER`* - use if restarting after network failure interrupted a previous run
 
-*`MIGRATE=[CONV-DB|XTTS-TS]`*
+*`OVERRIDE=[CONV-DB|XTTS-TS]`*
 - *`CONV-DB`* - forces migration by FULL logical export/import. 
 - *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
 
@@ -98,7 +98,7 @@ When the corresponding migration job next runs on the target database it recogni
 
 PROGRESS MONITORING
 -------------------
-After launching the `tgt_migr` script, the sqlplus session remains open; entering "/" shows progress of the migration on the screen. Data transfer progress is displayed first before details of the datapump integration. 
+After launching the `tgt_migr` script, the sqlplus session remains open after submitting a background job to execute the migration. Every migration step is logged in the table MIGRATION_LOG which can be viewed on the sqlplus session by entering "/".
 
 
 
