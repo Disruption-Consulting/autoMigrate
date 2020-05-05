@@ -15,23 +15,29 @@ RUN COMMAND
 sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET-TS|INCR-TS|INCR-TS-FINAL]
 ```
-
-
                          
 PARAMETERS:
------------                   
-*`mode=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`*
-- *`ANALYZE`* - show details about the database - e.g. name and size of database. Should start with always this (DEFAULT)
-  
-- *`EXECUTE`* - prepares database for immediate migration. Creates transfer user and sets tablespaces to read only.
+-----------   
+Parameters in `italics` are optional.
 
-- *`INCR-TS`* - prepares database for migration by a continuous process of taking incremental backups in a background job
+`MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`
+- *`ANALYZE`*
+>show details about the database - e.g. name and size of database. Should always start with this (DEFAULT)
+  
+- *`EXECUTE`*
+>prepares database for immediate migration. Creates transfer user and sets tablespaces to read only.
+
+- *`INCR-TS`*
+>prepares database for migration by a continuous process of taking incremental backups in a background job
                      
-- *`INCR-TS-FINAL`* - sets all tablespaces to read only before taking a final incremental backup.
+- *`INCR-TS-FINAL`*
+>sets all tablespaces to read only before taking a final incremental backup.
   
-- *`RESET-TS`* - use this following a successful migration in order to set tablespaces back to their former status.
+- *`RESET-TS`*
+>use this following a successful migration in order to set tablespaces back to their former status.
 
-- *`REMOVE`* - remove all objects and backups created by this script from the database
+- *`REMOVE`*
+>remove all objects and backups created by this script from the database
                            
 *`incr-ts-dir`* - OS directory to store backups - must have at least as much capacity as the existing database
   
