@@ -1,5 +1,4 @@
-INSTALLATION
-------------
+#INSTALLATION
 The installation comprises only one script file, "src_migr.sql". 
 
 Logon (or sudo) to "oracle" software owner, although any account that belongs to "dba" group and has sysdba
@@ -8,16 +7,14 @@ privilege can run this script.
 Place the script on a suitable filesystem - it only generates a few bytes of informational output.
 
 
-RUN COMMAND                         
------------
+#RUN COMMAND                         
               
 ```
 sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET-TS|INCR-TS|INCR-TS-FINAL]
 ```
                          
-PARAMETERS:
------------   
+#PARAMETERS   
 Parameters in *`italics`* are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`
@@ -43,8 +40,8 @@ Parameters in *`italics`* are optional.
 >Name of transfer user. Default is SNFTRANSFER.
 
   
-OPERATING NOTES
----------------
+#OPERATING NOTES
+
 All migrations with this utility use the Transportable Tablespace feature, which requires that source tablespaces are set to read only before they are copied to the target database and plugged in using DATAPUMP. 
 
 A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. For example, with an effective network transfer rate of 100GB/hour and a 500GB database it will take about 6 hours to complete the migration, including 1 hour to copy application metadata. In such a case, if the business deems 6 hours' downtime acceptable, then this migration is a simple 2 step process. For example, if we are migrating a 500GB SALES database from AIX to a PDB on LINUX where we have already created a CDB called V19CDB:
