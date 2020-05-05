@@ -123,4 +123,4 @@ As far as the business are concerned, their application remains available from M
 
 Step 3 completes the migration in about 1 hour - the time it takes to set the AIX tablespaces to read only, take and apply a final incremental backup and run the DATAPUMP integration job.
 
-**Note that if the SALES database had been 2TB, then the Direct Migration would have taken the best part of 24 hours; an equivalent incremental backup Migration would still have taken 1 hour to complete.
+**Note that if the SALES database had been 2TB, then the Direct Migration would have taken the best part of 24 hours; an equivalent incremental backup Migration would still have taken 1 hour to complete.**
