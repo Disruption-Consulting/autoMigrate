@@ -1,5 +1,5 @@
 # automigrate
-Automate the migration of Oracle databases versions 10 through 18 into version 19 PDB
+Automate migration of NON-CDB Oracle databases versions 10 through 18 into PDB
 
 OVERVIEW
 --------
