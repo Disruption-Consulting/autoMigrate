@@ -19,7 +19,7 @@ sqlplus / as sysdba @tgt_migr.sql \
     PDBNAME=PDB01 
 ```
 
-Migrates the database on host 10.1.23.124 listening for service WMLPROD to the current CDB as a new PDB called PDB01.
+Migrates the database running on host 10.1.23.124 with listener service WMLPROD to the current CDB as a new PDB called PDB01.
 
                          
 PARAMETERS:
@@ -39,19 +39,16 @@ Parameters listed in *`italics`* are optional.
 >Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
   
 *`TMPDIR`*
->OS directory where temporary files created during the migration should be held. Default is `/tmp`
-
-*`START=[PDB|TRANSFER]`*
-- *`PDB`* - starts by creating the new target PDB (DEFAULT)
-- *`TRANSFER`* - use if restarting after network failure interrupted a previous run
+>Directory where temporary files created during the migration should be held. Default is `/tmp`
 
 *`OVERRIDE=[CONV-DB|XTTS-TS]`*
 - *`CONV-DB`* - forces migration by FULL logical export/import. 
 - *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
 
-*`ACTION=[FORCE-STOP|DEL-UNPLUG]`*
+*`ACTION=[FORCE-STOP|DEL-UNPLUG|RESTART]`*
 - *`FORCE-STOP`*  - forces the damn MIGRATION_JOB to be stopped immediately
 - *`DEL-UNPLUG`* - if a re-run deletes any transferred data files that have not been plugged into the PDB
+- *`RESTART`* - use if restarting after network failure interrupted a previous run
 
 
 OPERATING NOTES
