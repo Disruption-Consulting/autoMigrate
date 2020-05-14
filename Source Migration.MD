@@ -26,9 +26,9 @@ Parameters in *`italics`* are optional.
                      
 - `INCR-TS-FINAL` - sets all tablespaces to read only before taking a final incremental backup
   
-- `RESET-TS` - sets tablespaces back to their pre-migration status
+- `RESET` - sets tablespaces back to their pre-migration status
 
-- `REMOVE` - remove all objects and backups created fo the migration
+- `REMOVE` - remove all objects and and any backups created for the migration
                            
 *`INCR-TS-DIR`*
 >OS directory to store incremental backups - mandatory if `MODE=INCR-TS`
@@ -44,7 +44,7 @@ Parameters in *`italics`* are optional.
 
 All migrations with this utility use the Transportable Tablespace feature, which requires that source tablespaces are set to read only before they are copied to the target database and plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
 
-A major limiting factor occurs when a combination of large data volumes and limited network bandwidth result in unacceptably long migration times. To resolve this problem, the automigrate utility offers 2 modes of operation. Both result in an identical migration; the only difference is how the data is transferred to the target server before it is ready for integration into the target database.
+A combination of large data volumes and limited network bandwidth may result in unacceptably long migration times. To resolve this problem, the automigrate utility offers 2 modes of operation. Both result in an identical migration; the only difference is how the data is transferred to the target server before it is integrated into the target database:
 
 1. Direct Migration
 2. Incremental Backup Migration
@@ -81,7 +81,7 @@ sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALE
 #
 ```
 ## Incremental Backup Migration
-Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same database could be migrated as a 3 step process over the course of 6 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
+Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same SALES database could be migrated over the course of 6 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
 
 
 1. Start the source database migration job on AIX on Monday:
@@ -105,8 +105,8 @@ sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=WMLD
 
 # At this point there is a background job on AIX running incremental backups every hour (by default)
 # At the same time there is a corresponding background job on LINUX running at the same frequency 
-# transferring AIX backups and applying them to its local copy of the tablespace datafiles
-# This continues indefinitely until ....
+# transferring AIX incremental backups and applying them to its local copy of the tablespace datafiles
+# This continues until ....
 ```
 
 3. On the following Saturday finalize the migration on AIX:
@@ -123,4 +123,4 @@ As far as the business are concerned, their application remains available from M
 
 Step 3 completes the migration in about 1 hour - the time it takes to set the AIX tablespaces to read only, take and apply a final incremental backup and run the DATAPUMP integration job.
 
-**Note that if the SALES database had been 2TB, then the Direct Migration would have taken the best part of 24 hours; an equivalent incremental backup Migration would still have taken 1 hour to complete.**
+**Note that if the SALES database had been 2TB in size, then a Direct Migration would have resulted in 24 hours application downtime; an equivalent incremental backup Migration would result in only 1 hour downtime.**
