@@ -103,25 +103,26 @@ PROGRESS MONITORING
 After launching the `tgt_migr` script, the sqlplus session remains open after submitting a background job to execute the migration. Every migration step is logged in the table MIGRATION_LOG which can be viewed on the sqlplus session by entering "/", e.g.
 
 ```
-14-MAY-20 13:57:20	RUNNING PCK_MIGRATION VERSION 14/5/2020
-14-MAY-20 13:57:20	------------------------------------------------------------------------------------------------
-14-MAY-20 13:57:20	FILE NAME                                             | STATUS    |   SOURCE (MB)|   TARGET (MB)
-14-MAY-20 13:57:20	------------------------------------------------------------------------------------------------
-14-MAY-20 13:57:20	/opt/oracle/oradata/CDB19/PDB01/users01.dbf           | STARTED   |          5.0 |              
-14-MAY-20 13:57:20	                                                      | COMPLETED |              |          5.0 
-14-MAY-20 13:57:21	/opt/oracle/oradata/CDB19/PDB01/ts_test_ts3.dbf       | STARTED   |         10.0 |              
-14-MAY-20 13:57:21	                                                      | COMPLETED |              |         10.0 
-14-MAY-20 13:57:21	/opt/oracle/oradata/CDB19/PDB01/ts_test_ts2.dbf       | STARTED   |         20.0 |              
-14-MAY-20 13:57:21	                                                      | COMPLETED |              |         20.0 
-14-MAY-20 13:57:21	/opt/oracle/oradata/CDB19/PDB01/new_ts_01.dbf         | STARTED   |         30.0 |              
-14-MAY-20 13:57:21	                                                      | COMPLETED |              |         30.0 
-14-MAY-20 13:57:21	/opt/oracle/oradata/CDB19/PDB01/ts_test_ts1.dbf       | STARTED   |        100.0 |              
-14-MAY-20 13:57:22	                                                      | COMPLETED |              |        100.0 
-14-MAY-20 13:57:22	/opt/oracle/oradata/CDB19/PDB01/ts_readonly.dbf       | STARTED   |        100.0 |              
-14-MAY-20 13:57:23	                                                      | COMPLETED |              |        100.0 
-14-MAY-20 13:57:23	------------------------------------------------------------------------------------------------
-14-MAY-20 13:57:23	                                    TOTAL TRANSFERRED | COMPLETED |        265.0 |        265.0 
-14-MAY-20 13:57:23	------------------------------------------------------------------------------------------------
-14-MAY-20 13:57:23	ALIGNING JOB REPEAT_INTERVAL
-14-MAY-20 13:57:24	SETTING MIGRATION_JOB REPEAT_INTERVAL TO freq=hourly; byminute=0; bysecond=0;
+SQL> /
+14.05.2020 13:57:20 RUNNING PCK_MIGRATION VERSION 14/5/2020
+14.05.2020 13:57:20 ------------------------------------------------------------------------------------------------
+14.05.2020 13:57:20 FILE NAME						  | STATUS    |   SOURCE (MB)|	 TARGET (MB)
+14.05.2020 13:57:20 ------------------------------------------------------------------------------------------------
+14.05.2020 13:57:20 /opt/oracle/oradata/CDB19/PDB01/users01.dbf 	  | STARTED   | 	 5.0 |
+14.05.2020 13:57:20							  | COMPLETED | 	     |		5.0
+14.05.2020 13:57:21 /opt/oracle/oradata/CDB19/PDB01/ts_test_ts3.dbf	  | STARTED   | 	10.0 |
+14.05.2020 13:57:21							  | COMPLETED | 	     |	       10.0
+14.05.2020 13:57:21 /opt/oracle/oradata/CDB19/PDB01/ts_test_ts2.dbf	  | STARTED   | 	20.0 |
+14.05.2020 13:57:21							  | COMPLETED | 	     |	       20.0
+14.05.2020 13:57:21 /opt/oracle/oradata/CDB19/PDB01/new_ts_01.dbf	  | STARTED   | 	30.0 |
+14.05.2020 13:57:21							  | COMPLETED | 	     |	       30.0
+14.05.2020 13:57:21 /opt/oracle/oradata/CDB19/PDB01/ts_test_ts1.dbf	  | STARTED   |        100.0 |
+14.05.2020 13:57:22							  | COMPLETED | 	     |	      100.0
+14.05.2020 13:57:22 /opt/oracle/oradata/CDB19/PDB01/ts_readonly.dbf	  | STARTED   |        100.0 |
+14.05.2020 13:57:23							  | COMPLETED | 	     |	      100.0
+14.05.2020 13:57:23 ------------------------------------------------------------------------------------------------
+14.05.2020 13:57:23					TOTAL TRANSFERRED | COMPLETED |        265.0 |	      265.0
+14.05.2020 13:57:23 ------------------------------------------------------------------------------------------------
+14.05.2020 13:57:23 ALIGNING JOB REPEAT_INTERVAL
+14.05.2020 13:57:24 SETTING MIGRATION_JOB REPEAT_INTERVAL TO freq=hourly; byminute=0; bysecond=0;
 ```
