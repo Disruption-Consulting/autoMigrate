@@ -11,13 +11,13 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
               
 ```
 sqlplus / as sysdba @src_migr.sql \
-    mode=[ANALYZE|EXECUTE|RESET-TS|INCR-TS|INCR-TS-FINAL]
+    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL]
 ```
                          
 # PARAMETERS   
 Parameters in *`italics`* are optional.
 
-`MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET-TS|REMOVE]`
+`MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
 - `ANALYZE` - show details about the database - e.g. name and size of database. Start with this (DEFAULT)
   
 - `EXECUTE` - prepares database for immediate migration - i.e. sets all application tablespaces to read only
