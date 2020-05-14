@@ -92,6 +92,8 @@ ORAENV_ASK=NO
 ORAENV_ASK=YES;
 
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS INCR-TS-DIR=/u02/backups
+
+# A background job is now taking incremental backups every hour (by default)
 ```
 
 2. Start the target database migration job on LINUX also on Monday:
@@ -103,9 +105,8 @@ ORAENV_ASK=YES;
 
 sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=WMLDEV PDBNAME=SALES
 
-# At this point there is a background job on AIX running incremental backups every hour (by default)
-# At the same time there is a corresponding background job on LINUX running at the same frequency 
-# transferring AIX incremental backups and applying them to its local copy of the tablespace datafiles
+# A corresponding background job is now running at the same frequency transferring AIX incremental backups
+# and applying them to its local copy of the tablespace datafiles.
 # This continues until ....
 ```
 
@@ -117,7 +118,10 @@ ORAENV_ASK=NO
 ORAENV_ASK=YES;
 
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
-```
+
+# This is when application downtime starts. 
+# Application tablespaces are set read only and a final incremental backup is taken
+# With no further intervention the migration on LINUX will automtically complete when the job next runs.
 
 As far as the business are concerned, their application remains available from Monday through Saturday. During this period incremental backups are automatically taken at a user-defined frequency, transferred and applied automatically to the target database copy. On cut-over day, depending on how frequently backups have been taken, the final backup/apply process typically takes a very short period to complete.
 
