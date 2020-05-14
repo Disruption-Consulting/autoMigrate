@@ -32,6 +32,9 @@ Parameters listed in *`italics`* are optional.
 `HOST`
 >Name of the server hosting the source database.
 
+`PORT`
+>Port on which service is registered with the listener. Default is 1521.
+
 `SERVICE`
 >Name of the service running on the source database that is registered with the local listener. We use these first 3 parameters to create the database link.
 
