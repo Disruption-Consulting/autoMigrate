@@ -1,12 +1,12 @@
 # automigrate
-Automate migration of NON-CDB Oracle databases versions 10 through 18 into PDB
+Automate migration of Oracle databases into PDB
 
 OVERVIEW
 --------
-This project attempts to unify the various methods available for migrating Oracle databases into the Multitenant architecture. 
-Database migrations are generally complex projects often involving dozens of steps executed on both source and target systems. Selecting an optimal migration method depends on a number of factors, including version and size of the database being migrated, its availability during the migration as well as any cross platform requirements and network capacity constraints.
+This project aims to simplify the process of migrating Oracle databases into a target Multitenant architecture (in 2020 this would be version 19, the terminal release).
+Database migrations are often a complex orchestration of multiple different tasks carried out on the source and target systems. Optimal migration will depend on a number of factors, including source database version, database size,  availability requirements as well as any cross platform requirements and network capacity constraints.
 
-This project aims to reduce a cross-platform migration to a minimum of interventions, involving a preparation script on the source database and an execution script on the target database. Only where business needs demand minimum downtime would a third intervention be required on the source database in order to finalize the process at an appointed cut-over date.
+This utility simplifies the process by applying the optimal migration method for the given source database, whilst automating the data transfer process through intra-database communication. Where minimal application downtime is a business requirement, the utility can transfer large databases over an extended period before an appointed cut-over date.
 
 BACKGROUND
 ----------
