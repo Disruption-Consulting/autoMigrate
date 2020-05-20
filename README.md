@@ -6,13 +6,15 @@ OVERVIEW
 This project aims to simplify the process of migrating Oracle databases into a target Multitenant architecture (in 2020 this would be version 19, the terminal release).
 Database migrations are often a complex orchestration of multiple different tasks carried out on the source and target systems. Optimal migration will depend on a number of factors, including source database version, database size,  availability requirements as well as any cross platform requirements and network capacity constraints.
 
-This utility simplifies the process by applying the optimal migration method for the given source database, whilst automating the data transfer process through intra-database communication. Where minimal application downtime is a business requirement, the utility can transfer large databases over an extended period before an appointed cut-over date.
+This utility simplifies the process by applying the optimal migration method for the given source database, whilst automating the data transfer process through intra-database communication. Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
 
 BACKGROUND
 ----------
-Starting with Oracle v20, the NON-CDB architecture is no longer supported. However, most production Oracle landscapes include at least some v12, v11 and even v10 databases. With increasing emphasis on reducing the enterprise cost of IT infrastructure, there is a growing need to simplify the process of database migration. This project was motivated by the need to migrate some 40 Production Oracle databases, versions 10 through 12 running on AIX to v19 PDBs running on Linux RHEL (nb. v19 is the terminal Oracle database software release offering the longest extended support period). 
+Starting with v20, Oracle will stop all further development of the NON-CDB architecture and have announced that NON-CDB will be de-supported in a future release. The CDB architecture, however, represents a radical departure from NON-CDB and many sites have cautiously stayed with their familiar NON-CDB databases. Compounding the problem, many other sites continue to maintain old database versions that are well past their extended support date. In order to encourage their clients to change, Oracle now (since 2020) permit 3 PDBs to run license-free per v19 CDB - n.b the Multitenant option costs about 12000 USD per core per year and allows up to 
 
-The announcement (November, 2019) that 3 PDBs may now run license-free per v19 CDB is further motivation to deliver a more automated migration process.
+This project was motivated by the need to rapidly and consistently migrate some 40 Production Oracle databases, versions 10 through 12 running on AIX to v19 PDBs running on Linux RHEL. Manually migrating this many databases 
+
+; the announcement by 
 
 TECHNICAL DESCRIPTION
 ---------------------
