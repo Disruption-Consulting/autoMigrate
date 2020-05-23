@@ -10,8 +10,9 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
               
 ```
 sqlplus / as sysdba @src_migr.sql \
-    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL]
-    *`incr-ts-dir=/dirname`*
+    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL] \
+    incr-ts-dir=/dirname \
+    incr-ts-freq=frequency
 ```
                          
 # PARAMETERS   
@@ -31,7 +32,7 @@ Parameters in *`italics`* are optional.
 - `REMOVE` - remove all objects and and any backups created for the migration
                            
 *`INCR-TS-DIR`*
->OS directory to store incremental backups - mandatory if `MODE=INCR-TS`
+>directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR-TS`
   
 *`INCR-TS-FREQ`*
 >frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
@@ -42,43 +43,37 @@ Parameters in *`italics`* are optional.
   
 # OPERATING NOTES
 
-All migrations with this utility use the Transportable Tablespace feature, which requires that source tablespaces are set to read only before they are copied to the target database and plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
+All migrations with this utility use the Transportable Tablespace feature, which requires that application tablespaces on the source system are set to read only before being copied to the target database and plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
 
-A combination of large data volumes and limited network bandwidth may result in unacceptably long migration times. To resolve this problem, the automigrate utility offers 2 modes of operation. Both result in an identical migration; the only difference is how the data is transferred to the target server before it is integrated into the target database:
+Where large data volumes and limited network bandwidth result in an unacceptably long delay, the automigrate utility offers 2 different methods for copying the source data. The end result is the same in both cases:
 
 1. Direct Migration
 2. Incremental Backup Migration
 
 ## Direct Migration
-As an example, with an effective network transfer rate of 100GB/hour and a 500GB database called SALES running on AIX it would take about 6 hours to complete a direct migration to a PDB running on LINUX. 
+As an example, with an effective network transfer rate of 100GB/hour and a 500GB database called SALES running on AIX it would take about 6 hours to complete a direct migration to a Pluggabe Database running on LINUX. 
 
 Two interventions would be required - one on AIX and one on LINUX:
 
-1. Run the source database migration script on AIX having set its environment. 
+1. Run the source database migration script on AIX. 
 
 ```
-export ORACLE_SID=SALES
-ORAENV_ASK=NO
-. oraenv
-ORAENV_ASK=YES;
-
 sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
+
+# - all application tablespaces are now set to read only
+# - creates databas user SNFTRANSFER with appropriate privileges to act as the main conduit for the migration
 ```
 
 2. Start the target database migration on LINUX
 
 ```
-export ORACLE_SID=V19CDB
-ORAENV_ASK=NO
-. oraenv
-ORAENV_ASK=YES;
-
 sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
-#
-#  wait 5 seconds to create a new PDB called SALES in the V19CDB database
-#  wait 5 hours for 500GB of data files to be transferred from the AIX server to the target LINUX server
-#  wait 1 hour for DATAPUMP to plug in the tablespaces, copy application metadata, and gather statistics
-#
+
+#  - creates a new PDB called SALES
+#  - creates database link to source AIX database as identified by HOST and SERVICE parameters
+#  - starts a job to copy 500GB of data files from the AIX server 
+#  - once transfer has finished, generates shell script to run "impdp" and complete the migration
+
 ```
 ## Incremental Backup Migration
 Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same SALES database could be migrated over the course of 6 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
