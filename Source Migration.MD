@@ -98,18 +98,13 @@ sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALE
 ```
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
 
-# - set application tablespaces to read only. Application downtime starts now.
-# - take a final incremental backup 
+# - sets application tablespaces to read only - downtime starts now.
+# - takes a final incremental backup and drops the background job
 ```
 
 4. Straight after on LINUX
 
-Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration.
+Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration. How long it takes to complete the migration depends entirely on the complexity of the application - the more PL/SQL packages, triggers, views etc the longer it will take.
 
 
-
-As far as the business are concerned, their application remains available from Monday through Saturday. During this period incremental backups are automatically taken at a user-defined frequency, transferred and applied automatically to the target database copy. On cut-over day, depending on how frequently backups have been taken, the final backup/apply process typically takes a very short period to complete.
-
-Step 3 completes the migration in about 1 hour - the time it takes to set the AIX tablespaces to read only, take and apply a final incremental backup and run the DATAPUMP integration job.
-
-**Note that if the SALES database had been 2TB in size, then a Direct Migration would have resulted in 24 hours application downtime; an equivalent incremental backup Migration would result in only 1 hour downtime.**
+**Note that if the SALES database had been 2TB in size, then a Direct Transfer would have resulted in 24 hours application downtime; an equivalent incremental backup Migration would result in only 1 hour downtime.**
