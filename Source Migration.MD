@@ -11,7 +11,7 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
 ```
 sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL]
-    *incr-ts-dir=/dirname*
+    *`incr-ts-dir=/dirname`*
 ```
                          
 # PARAMETERS   
