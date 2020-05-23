@@ -2,8 +2,7 @@ INSTALLATION
 ------------
 The installation comprises only one script file, "tgt_migr.sql". 
 
-Logon (or sudo) to "oracle" software owner, although any account that belongs to the "dba" group and therefore has sysdba
-privilege can run this script.
+Logon to "oracle" software owner, although any account belonging to the "dba" group can run this script.
 
 Place the script on a suitable filesystem - it only generates a few bytes of informational output.
 
@@ -49,9 +48,9 @@ Parameters listed in *`italics`* are optional.
 - *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
 
 *`ACTION=[FORCE-STOP|DEL-UNPLUG|RESTART]`*
-- *`FORCE-STOP`*  - forces the damn MIGRATION_JOB to be stopped immediately
+- *`FORCE-STOP`*  - stops the MIGRATION_JOB immediately
 - *`DEL-UNPLUG`* - if a re-run deletes any transferred data files that have not been plugged into the PDB
-- *`RESTART`* - use if restarting after network failure interrupted a previous run
+- *`RESTART`* - use if restarting after network failure had interrupted a previous run
 
 
 OPERATING NOTES
