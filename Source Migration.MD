@@ -19,9 +19,9 @@ sqlplus / as sysdba @src_migr.sql \
 Parameters in *`italics`* are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
-- `ANALYZE` - show details about the database - e.g. name and size of database. Start with this (DEFAULT)
+- `ANALYZE` - show details about the database - e.g. name and size of database (DEFAULT)
   
-- `EXECUTE` - prepares database for immediate migration - i.e. sets all application tablespaces to read only
+- `EXECUTE` - prepares database for direct migration - i.e. sets all application tablespaces to read only
 
 - `INCR-TS` - starts migration by taking incremental backups in a background job. Tablespaces remain online
                      
@@ -29,7 +29,7 @@ Parameters in *`italics`* are optional.
   
 - `RESET` - sets tablespaces back to their pre-migration status
 
-- `REMOVE` - remove all objects and and any backups created for the migration
+- `REMOVE` - remove all database objects and any backups created for the migration
                            
 *`INCR-TS-DIR`*
 >directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR-TS`
@@ -45,23 +45,23 @@ Parameters in *`italics`* are optional.
 
 All migrations with this utility use the Transportable Tablespace feature, which requires that application tablespaces on the source system are set to read only before being copied to the target database and plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
 
-Where large data volumes and limited network bandwidth result in an unacceptably long delay, the automigrate utility offers 2 different methods for copying the source data. The end result is the same in both cases:
+Since large data volumes and limited network bandwidth may result in an unacceptably long period of application downtime, the automigrate utility offers 2 different methods for copying the source data. The end result is the same in both cases:
 
-1. Direct Migration
-2. Incremental Backup Migration
+1. Direct Transfer
+2. Incremental Backup
 
-## Direct Migration
-As an example, with an effective network transfer rate of 100GB/hour and a 500GB database called SALES running on AIX it would take about 6 hours to complete a direct migration to a Pluggabe Database running on LINUX. 
+## Direct Transfer
+As an example, with an effective network transfer rate of 100GB/hour and a 500GB database called SALES running on AIX it would take about 6 hours to complete a direct migration to a Pluggable Database running on LINUX. 
 
-Two interventions would be required - one on AIX and one on LINUX:
+Two interventions would be required -
 
-1. Run the source database migration script on AIX. 
+1. Run the source database migration script on AIX host 10.1.23.127. 
 
 ```
 sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
 
 # - all application tablespaces are now set to read only
-# - creates databas user SNFTRANSFER with appropriate privileges to act as the main conduit for the migration
+# - creates database user SNFTRANSFER to act as the conduit for the migration
 ```
 
 2. Start the target database migration on LINUX
@@ -70,53 +70,43 @@ sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
 sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
 
 #  - creates a new PDB called SALES
-#  - creates database link to source AIX database as identified by HOST and SERVICE parameters
-#  - starts a job to copy 500GB of data files from the AIX server 
-#  - once transfer has finished, generates shell script to run "impdp" and complete the migration
+#  - creates database link to SALES database as identified by HOST and SERVICE parameters
+#  - starts a job to copy 500GB of data files
+#  - when transfer finishes, generates shell script to run "impdp" and complete the migration
 
 ```
-## Incremental Backup Migration
-Where application availability is critical to the business and downtime must be limited to say, 1 hour maximum, then the same SALES database could be migrated over the course of 6 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
+## Incremental Backup
+Where application availability is critical to the business and downtime must be limited to a small window, then the same SALES database could be migrated over the course of 5 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
 
 
 1. Start the source database migration job on AIX on Monday:
 ```
-export ORACLE_SID=SALES
-ORAENV_ASK=NO
-. oraenv
-ORAENV_ASK=YES;
-
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS INCR-TS-DIR=/u02/backups
 
-# A background job is now taking incremental backups every hour (by default)
+# - background job is now taking file image copies and incremental backups every hour (by default)
 ```
 
 2. Start the target database migration job on LINUX also on Monday:
 ```
-export ORACLE_SID=V19CDB
-ORAENV_ASK=NO
-. oraenv
-ORAENV_ASK=YES;
+sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
 
-sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=WMLDEV PDBNAME=SALES
-
-# A corresponding background job is now running at the same frequency transferring AIX incremental backups
-# and applying them to its local copy of the tablespace datafiles.
-# This continues until ....
+# - background job, running at the same frequency, retrieves the file image copies and incremental backups
+# - applies incremental backups to the file image copies
 ```
 
-3. On the following Saturday finalize the migration on AIX:
+3. On the following Saturday, finalize the migration on AIX:
 ```
-export ORACLE_SID=SALES
-ORAENV_ASK=NO
-. oraenv
-ORAENV_ASK=YES;
-
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
 
-# This is when application downtime starts. 
-# Application tablespaces are set read only and a final incremental backup is taken
-# With no further intervention the migration on LINUX will automtically complete when the job next runs.
+# - set application tablespaces to read only. Application downtime starts now.
+# - take a final incremental backup 
+```
+
+4. Straight after on LINUX
+
+Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration.
+
+
 
 As far as the business are concerned, their application remains available from Monday through Saturday. During this period incremental backups are automatically taken at a user-defined frequency, transferred and applied automatically to the target database copy. On cut-over day, depending on how frequently backups have been taken, the final backup/apply process typically takes a very short period to complete.
 
