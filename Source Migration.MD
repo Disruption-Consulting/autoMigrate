@@ -1,8 +1,7 @@
 # INSTALLATION
 The installation comprises only one script file, "src_migr.sql". 
 
-Logon (or sudo) to "oracle" software owner, although any account that belongs to "dba" group and has sysdba
-privilege can run this script.
+Logon to "oracle" software owner. N.b any account belonging to "dba" group can run this script.
 
 Place the script on a suitable filesystem - it only generates a few bytes of informational output.
 
@@ -12,6 +11,7 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
 ```
 sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL]
+    *incr-ts-dir=/dirname*
 ```
                          
 # PARAMETERS   
