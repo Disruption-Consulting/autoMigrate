@@ -67,7 +67,7 @@ sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
 2. Start the target database migration on LINUX
 
 ```
-sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
+sqlplus / as sysdba @tgt_migr.sql HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
 
 #  - creates a new PDB called SALES
 #  - creates database link to SALES database as identified by HOST and SERVICE parameters
@@ -105,7 +105,7 @@ sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
 
 4. Straight after on LINUX
 
-Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration. How long it takes to complete the migration depends entirely on the complexity of the application - the more PL/SQL packages, triggers, views etc, the longer it will take.
+Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration. How long it takes to complete the migration depends entirely on the size of the application - the more PL/SQL packages, triggers, views etc, the longer it will take for DATAPUMP to complete.
 
 
-**Note that if the SALES database had been 2TB in size, then a Direct Transfer would have resulted in 24 hours application downtime; the equivalent incremental backup Migration would still require only 1 hour downtime.**
+**Note that if the SALES database had been 2TB in size, then a Direct Transfer would have resulted in 24 hours application downtime; the equivalent migration by appyling incremental backups would only require 1 hour downtime.**
