@@ -1,7 +1,7 @@
 # INSTALLATION
 The installation comprises only one script file, "src_migr.sql". 
 
-Logon to "oracle" software owner. N.b any account belonging to "dba" group can run this script.
+Logon to "oracle" software owner - although any account belonging to "dba" group can run this script.
 
 Place the script on a suitable filesystem - it only generates a few bytes of informational output.
 
@@ -10,7 +10,7 @@ Place the script on a suitable filesystem - it only generates a few bytes of inf
               
 ```
 sqlplus / as sysdba @src_migr.sql \
-    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL] \
+    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL|REMOVE] \
     incr-ts-dir=/dirname \
     incr-ts-freq=frequency
 ```
@@ -38,7 +38,7 @@ Parameters in *`italics`* are optional.
 >frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
 
 *`USER`*
->Name of transfer user. Default is SNFTRANSFER.
+>Name of transfer user. Default is PDBADMIN. Ony change this if "PDBADMIN" happens to exist pre-migration.
 
   
 # OPERATING NOTES
@@ -61,7 +61,7 @@ Two interventions would be required -
 sqlplus / as sysdba @src_migr.sql MODE=EXECUTE
 
 # - all application tablespaces are now set to read only
-# - creates database user SNFTRANSFER to act as the conduit for the migration
+# - creates database user PDBADMIN to act as the conduit for the migration
 ```
 
 2. Start the target database migration on LINUX
@@ -76,35 +76,36 @@ sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALE
 
 ```
 ## Incremental Backup
-Where application availability is critical to the business and downtime must be limited to a small window, then the same SALES database could be migrated over the course of 5 days during which period it would be fully available to the business. Application downtime would be limited to 1 hour on the Saturday.
+Where application availability is critical to the business and downtime must be limited to a small window, then the same SALES database could be migrated over the course of 5 days during which period it would be fully available to the business. Application downtime would be limited to only 1 hour on the Saturday.
 
 
 1. Start the source database migration job on AIX on Monday:
 ```
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS INCR-TS-DIR=/u02/backups
 
-# - background job is now taking file image copies and incremental backups every hour (by default)
+# - background job is now taking file image copies and incremental backups every hour on the hour (default)
 ```
 
 2. Start the target database migration job on LINUX also on Monday:
 ```
-sqlplus / as sysdba @tgt_migr.sql USER=SNFTRANSFER HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
+sqlplus / as sysdba @tgt_migr.sql HOST=10.1.23.127 SERVICE=SALES PDBNAME=SALES
 
 # - background job, running at the same frequency, retrieves the file image copies and incremental backups
 # - applies incremental backups to the file image copies
+# - steps 1 and 2 continue until ...
 ```
 
 3. On the following Saturday, finalize the migration on AIX:
 ```
 sqlplus / as sysdba @src_migr.sql MODE=INCR-TS-FINAL
 
-# - sets application tablespaces to read only - downtime starts now.
+# - sets application tablespaces to read only - application downtime starts now.
 # - takes a final incremental backup and drops the background job
 ```
 
 4. Straight after on LINUX
 
-Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration. How long it takes to complete the migration depends entirely on the complexity of the application - the more PL/SQL packages, triggers, views etc the longer it will take.
+Inspect the Job scheduler to determine when the MIGRATION JOB will run next .. it may well have already completed in which case the MIGRATION LOG will reveal the command to complete the migration. How long it takes to complete the migration depends entirely on the complexity of the application - the more PL/SQL packages, triggers, views etc, the longer it will take.
 
 
-**Note that if the SALES database had been 2TB in size, then a Direct Transfer would have resulted in 24 hours application downtime; an equivalent incremental backup Migration would result in only 1 hour downtime.**
+**Note that if the SALES database had been 2TB in size, then a Direct Transfer would have resulted in 24 hours application downtime; the equivalent incremental backup Migration would still require only 1 hour downtime.**
