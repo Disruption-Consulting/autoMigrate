@@ -8,7 +8,7 @@ See MOS Doc ID 742060.1 for the most up-to-date release information.
 
 PROCESS OVERVIEW
 ----------------
-1. Download Oracle v19 software from My Oracle Support (MOS)
+1. Download Oracle v19 software from MOS
 2. Create new v19 home directory and unzip download
 3. Download latest OPatch utility and replace in v19 home
 4. Download 19.7 patchset and install (this is the latest patchset issued April 2020)
@@ -98,8 +98,8 @@ cd /u01/app/oracle/product/19.0.0
 zip /tmp/ora197home.zip dbhome_1
 ```
 
-6 Create v19.7 CDB
-------------------
+6. Create v19.7 Database
+------------------------
 ```
 dbca -silent -createDatabase \
 -templateName General_Purpose.dbc \
