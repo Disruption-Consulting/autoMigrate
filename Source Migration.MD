@@ -1,9 +1,7 @@
 # INSTALLATION
-The installation comprises only one script file, "src_migr.sql". 
+The installation comprises sqlplus script "src_migr.sql" and package "pck_migration_src.sql" 
 
-Logon to "oracle" software owner - although any account belonging to "dba" group can run this script.
-
-Place the script on a suitable filesystem - it only generates a few bytes of informational output.
+Logon as "oracle" software owner or any account belonging to the "dba" group and download these scripts onto a suitable filesystem.
 
 
 # RUN COMMAND                         
@@ -38,12 +36,12 @@ Parameters in *`italics`* are optional.
 >frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
 
 *`USER`*
->Name of transfer user. Default is PDBADMIN. Ony change this if "PDBADMIN" happens to exist pre-migration.
+>Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
 
   
 # OPERATING NOTES
 
-All migrations with this utility use the Transportable Tablespace feature, which requires that application tablespaces on the source system are set to read only before being copied to the target database and plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
+All migrations with this utility use the Transportable Tablespace feature, which requires that application tablespaces on the source system are set to read only before being plugged in using DATAPUMP. A period of application downtime is therefore unavoidable from the moment the tablespaces are set read only until the completion of the DATAPUMP process. 
 
 Since large data volumes and limited network bandwidth may result in an unacceptably long period of application downtime, the automigrate utility offers 2 different methods for copying the source data. The end result is the same in both cases:
 
