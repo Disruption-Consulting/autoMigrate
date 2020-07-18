@@ -134,15 +134,16 @@ exit
 The above should confirm that this indeed is a v19.7 database.
 
 
-Note on Switching homes
------------------------
-When you have multiple Oracle databases built from different homes on the same server, it is usually a good idea to configure a function in your .bash_profile (or .bashrc) like the following to allow you to easily switch.
+Note on Switching homes (LINUX)
+-------------------------------
+Easily accessing multiple Oracle databases built from different homes on the same server can be achieved by configuring functions in the "oracle" account's ".bash_profile" file.
 
-Here I'm assuming you have 2 databases, CDB18 and CDB19, both of which will have been configured in /etc/oratab after running the "dbac" utility.
+For example, if you have used the "dbac" utility to create a v18 database CDB18 and a v19 database CDB19, then the following functions in ".bash_profile" allow easy acesss to both:
 
 ```
 CDB19 () { ORACLE_SID=CDB19; ORAENV_ASK=NO; . oraenv; ORAENV_ASK=YES; }
 CDB18 () { ORACLE_SID=CDB18; ORAENV_ASK=NO; . oraenv; ORAENV_ASK=YES; }
 ```
+"dbac" on LINUX updates the /etc/oratab startup file which is used by the ".oraenv" script to set ORACLE_HOME, ORACLE_SID and PATH.
 
-The use of "oraenv" is Oracle's recommended method for setting ORACLE_HOME, ORACLE_SID and PATH which is all you need really to move about from one database to another running sqlplus etc. Enter "ORA19" and you're all set for database CDB19; enter "CDB18" and you're all set for database CDB18.
+Enter "ORA19" and you're all set for database CDB19; enter "CDB18" and you're all set for database CDB18.
