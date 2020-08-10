@@ -1,5 +1,7 @@
 # automigrate
-Automate migration of Oracle databases into PDB
+Automate migration of Oracle databases from non-CDB to PDB.
+Tested on database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB source)
+Tested on database versions 19.3, 19.7, 19.8 (PDB target)
 
 OVERVIEW
 --------
