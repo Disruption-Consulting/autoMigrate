@@ -1,5 +1,5 @@
 # automigrate
-Automate migration of Oracle databases from non-CDB to PDB.
+Automate migration of Oracle databases to Multitenant (CDB/PDB) architecture.
 - Tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
 - Tested on target database versions 18.3, 19.7, 19.8 
 
