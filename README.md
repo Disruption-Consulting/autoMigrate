@@ -1,20 +1,16 @@
 # automigrate
 Automate migration of Oracle databases from non-CDB to PDB.
-Tested on database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB source)
-Tested on database versions 19.3, 19.7, 19.8 (PDB target)
+- Tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
+- Tested on target database versions 18.3, 19.7, 19.8 
 
 OVERVIEW
 --------
-This project aims to simplify the process of migrating Oracle databases into a target Multitenant architecture (in 2020 this would be version 19, the terminal release).
-Database migrations are often a complex orchestration of multiple different tasks carried out on the source and target systems. Optimal migration will depend on a number of factors, including source database version, database size,  availability requirements as well as any cross platform requirements and network capacity constraints.
-
-This utility simplifies the process by applying the optimal migration method for the given source database, whilst automating the data transfer process through intra-database communication. Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
+Since version 10, optimal Oracle database migration consists of 
+This utility applies the optimal migration method for a given source database, whilst fully automating the data transfer process through intra-database communication. Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
 
 BACKGROUND
 ----------
 Starting with v20, Oracle will stop all further development of the NON-CDB architecture and have announced that NON-CDB will be de-supported in a future release. The CDB architecture, however, represents a radical departure from NON-CDB and many sites have cautiously stayed with their familiar NON-CDB databases. Compounding the problem, many other sites continue to maintain old database versions that are well past their extended support date. In order to encourage their clients to change, Oracle now (since 2020) permit 3 PDBs to run license-free per v19 CDB.
-
-This project was motivated by the need to rapidly and consistently migrate some 40 Production Oracle databases, versions 10 through 12 running on AIX to v19 PDBs running on Linux RHEL. Successfully migrating so many disparate databases over a short period of time using a documented list of over 50 co-ordinated tasks is unfeasible. We therefore developed this utility, comprising 2 SQL scripts - one for source and one for target - which enable each migration to be completed consistently and optimally.
 
 TECHNICAL DESCRIPTION
 ---------------------
