@@ -1,11 +1,15 @@
 # automigrate
-Automate migration of Oracle databases to Multitenant (CDB/PDB) architecture.
+Automate migration of non-CDB Oracle databases to Multitenant (CDB/PDB) architecture.
 - Tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
-- Tested on target database versions 18.3, 19.7, 19.8 
+- Tested on target database versions 19.7, 19.8 
 
 OVERVIEW
 --------
-Since version 10, optimal Oracle database migration consists of 
+Migrating to a new version of Oracle database is invariably a costly and risky affair, that is generally avoided for as long as possible by most organizations. However, at the time of writing (July 2020) there are a number of factors that make it increasingly incumbent on Oracle customers to migrate to the current terminal release - version 19:
+- from version 20, Oracle no longer supports the non-Multitenant architecture
+- Oracle offers 3 PDBs per version 19 CDB license-free
+- version 19 is supported until 2027
+
 This utility applies the optimal migration method for a given source database, whilst fully automating the data transfer process through intra-database communication. Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
 
 BACKGROUND
