@@ -5,12 +5,16 @@ Automate migration of non-CDB Oracle databases to Multitenant (CDB/PDB) architec
 
 OVERVIEW
 --------
-Migrating to a new version of Oracle database is invariably a costly and risky affair, that is generally avoided for as long as possible by most organizations. However, at the time of writing (July 2020) there are a number of factors that make it increasingly incumbent on Oracle customers to migrate to the current terminal release - version 19:
-- from version 20, Oracle no longer supports the non-Multitenant architecture
+Migrating to a new version of Oracle database is invariably a costly and risky affair, which most organizations avoid for as long as possible. However, at the time of writing (July 2020) there are a number of factors that make it increasingly incumbent on Oracle customers to migrate to the current terminal release - version 19:
+- Oracle no longer supports the non-Multitenant architecture, i.e. non-CDB, as of version 20
 - Oracle offers 3 PDBs per version 19 CDB license-free
 - version 19 is supported until 2027
+- through sharing infrastructure resources, adoption of Multitenant significantly lowers cost of ownership
+- version 19 enables limited use of features like in-Memory at no extra license cost
 
-This utility applies the optimal migration method for a given source database, whilst fully automating the data transfer process through intra-database communication. Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
+Essentially, all pre-19 databases need to be migrated before these fall out of support (e.g. version 11.2.0.4 ends Premier support December 2020).   
+
+Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
 
 BACKGROUND
 ----------
