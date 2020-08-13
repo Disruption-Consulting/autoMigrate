@@ -18,8 +18,6 @@ Essentially, all pre-19 databases need to be migrated before falling out of supp
 
 
 
-BACKGROUND
-----------
 The "autoMigrate" utility was developed to reduce the complexity and large number of manual tasks involved in database migration. These include, but are by no means limited to:
 
 - transporting business data from source to target, ensuring the process is restartable in the event of network failure
@@ -30,27 +28,15 @@ The "autoMigrate" utility was developed to reduce the complexity and large numbe
 - confirming use of any DIRECTORY objects in source that may need to be redefined in target
 - confirming use of any DATABASE LINK objects that may need to be redefined in target
 - ensuring all grants to SYS-owned objects are replayed in the target database
+- ensure target tablespaces are set to their pre-migration status on the source database
 
 Even for a simple database the above can represent many dozens of individual tasks that need to be prepared, coordinated and tested. 
 
-Based on the Transportable Tablesspaces feature, the autoMigrate utility reduces database migration to at most 3 steps:
-1. run the source migration sqlplus script on the source database (optionally to signal the start of a data migration process)
-2. run the target migration sqlplus script on the target database
-3. if step 1 started a migration process then run the same source migration sqlplus script to signal end of the process
+Based on the Transportable Tablespace feature, available starting version 10.1.0.3, the autoMigrate utility reduces database migration to at most 3 steps:
+1. run sqlplus script on the source database, optionally signalling the start of a protracted data migration process
+2. run sqlplus script on the target database
+3. if step 1 started a data migration process then run the same script on the source database to signal end of the process
 
+A "protracted data migration process" allows data to be migrated within a timeframe that supports availability requirements of the application. Alternatively, and by default, source data files are set to read only and therefore unavailable to the application until the migration is complete. 
 
-TECHNICAL DESCRIPTION
----------------------
-With the cross platform transportable tablespace feature becoming available starting with v10, Oracle database migration has become a more efficient process; copying physical database data files will always be quicker than logically exporting / importing rows of data.
-
-The advent of Datapump, particularly with the network link option, plus the DBMS_FILE_TRANSFER utility which automatically converts to target database endianness, together with the Transportable Database feature available starting 11.2.0.3 have all enabled database migrations to be more streamlined. Potentially.
-
-The issue is often one of making the right choice for the situation at hand. Even experienced DBAs can be unaware of modern migration methods, preferring trusted approaches even when these are manifestly no longer appropriate. For example, I've seen a highly respected DBA recently build a suite of complex application metadata extract / import scripts, unaware that starting with 11.2.0.3 there is an option in DATAPUMP to migrate both data and metadata at the same time by specifying just 2 parameters - i.e. `impdp TRANSPORTABLE=ALWAYS FULL=YES` ... replacing 1000's of lines of complex code to migrate an application's views, PL/SQL packages, database links, triggers etc. And then there are grants to SYS-owned objects which are not exported by DATAPUMP - these need to be migrated as well if application code is referencing objects like SYS.V$SESSION for example.
-
-Application owners like to "see" a guarantee that their databases have been fully migrated. We therefore need to include a comprehensive reconciliation process in the migration. What about statistics? Should we export these? Or re-gather them in the migrated database? What about fixed table stats? Dictionary stats? And what about database links? These will be imported but probably won't work if the connectivity is not enabled in the target database - application owners need to "see" the application database links - maybe they aren't needed anymore? Maybe they should be replaced by some other data transfer technique, especially if the migration is to Cloud infrastructure. In all cases, the migration not only has to succeed technically, but must provide an in-depth report of where post-migration tasks need to be carried out. What about loosely-coupled object references - i.e. where database link references are included in dynamic SQL within application code? 
-
-Of course, migrated directory objects need to be reviewed for much the same reasons as database links. And then we have potential issues about setting transported tablespaces to their pre-migration status. Suppose we migrated a 100TB read only tablespace - we won't be very happy if this gets backed up by our RMAN scripts after the migration .... and yet, we have to remember that Transportable Database automatically sets all migrated tablespaces to READ WRITE.
-
-The point is, migrations are complex, involve a lot of steps, and we haven't even discussed pre-11.2.0.3 options (hint: even more complex). Beyond the technical complexities involved, it may well be necessary to constrain a migration to a limited time frame of application downtime. The utility is based on the Transportable Tablespace technique which unavoidably requires that source tablespaces be set to read only *before* they are copied to the target system. However, if the source database is 10TB in size and our effective network bandwith is 100GB/hour, the business may not be able to tolerate 4 days' application downtime needed to transport the data. To resolve this problem, the utility can transport data over an extended period during which the application remains fully online and available. It does this be taking incremental backups of file image copies that are automatically transferred to the target system where they are applied according to a frequency that minimizes the final backup elapsed time.
-
-In this way, all migrations starting from version 10 can be automated using at most a total of 3 source and target interventions depending on whether data is transferred by incremental backup. The utility guarantees that each migration is optimal for the source database version and uses a minimum of resources and intrusion. Most importantly, each migration is consistent and complete. It is noted that I.T. management, being inherently risk-averse, will always prefer an Oracle-supported solution - indeed, you can obtain from Oracle MOS a collection of files and scripts to enable database file transfer by applying incremental backup - however, these require no small amount of effort to install and involve more steps where cross platform migration is involved. By contrast, this utility provides enhanced functionality within a single SQL script.
+For example, migrating a 10TB database over an effective network bandwith of 100GB/hour would take at least 100 elapsed hours during which the application would by default be unavailable. To mitigate such cases, the autoMigrate utility allows the application to remain fully online whilst it takes incremental data file backups which are  transfered and applied automatically to the target database; in this way, very large, active databases can be transfered over say, a week before a final incremental backup taken say, on the weekend is applied and used to complete the migration which could complete within an hour (depending on the degree of source database udate activity).
