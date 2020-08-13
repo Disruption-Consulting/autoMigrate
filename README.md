@@ -40,3 +40,49 @@ Based on the Transportable Tablespace feature, available starting version 10.1.0
 A "protracted data migration process" allows data to be migrated within a timeframe that supports availability requirements of the application. Alternatively, and by default, source data files are set to read only and therefore unavailable to the application until the migration is complete. 
 
 For example, migrating a 10TB database over an effective network bandwith of 100GB/hour would take at least 100 elapsed hours during which the application would by default be unavailable. To mitigate such cases, the autoMigrate utility allows the application to remain fully online whilst it takes incremental data file backups which are  transfered and applied automatically to the target database; in this way, very large, active databases can be transfered over say, a week before a final incremental backup taken say, on the weekend is applied and used to complete the migration which could complete within an hour (depending on the degree of source database udate activity).
+
+
+# OPERATING NOTES
+The migration scripts are included in "autoMigrate.zip" within this repository.
+
+Scripts "src_migr.sql" and "pck_migration_src.sql" should be unzippped to a suitable filesystem on the source server, e.g. "/tmp".
+
+Scripts "tgt_migr.sql" and "pck_migration_tgt.sql" should be unzippped to a suitable filesystem on the target server, e.g. "/tmp".
+
+Logon as "oracle" software owner or any account belonging to the "dba" group and download these scripts onto a suitable filesystem.
+
+
+# RUN COMMAND                         
+              
+```
+sqlplus / as sysdba @src_migr.sql \
+    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL|REMOVE] \
+    incr-ts-dir=/dirname \
+    incr-ts-freq=frequency
+```
+                         
+# PARAMETERS   
+Parameters in *`italics`* are optional.
+
+`MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
+- `ANALYZE` - show details about the database - e.g. name and size of database (DEFAULT)
+  
+- `EXECUTE` - prepares database for direct migration - i.e. sets all application tablespaces to read only
+
+- `INCR-TS` - starts migration by taking incremental backups in a background job. Tablespaces remain online
+                     
+- `INCR-TS-FINAL` - sets all tablespaces to read only before taking a final incremental backup
+  
+- `RESET` - sets tablespaces back to their pre-migration status
+
+- `REMOVE` - remove all database objects and any backups created for the migration
+                           
+*`INCR-TS-DIR`*
+>directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR-TS`
+  
+*`INCR-TS-FREQ`*
+>frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
+
+*`USER`*
+>Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
+
