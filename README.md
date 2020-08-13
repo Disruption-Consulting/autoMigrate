@@ -20,7 +20,24 @@ Essentially, all pre-19 databases need to be migrated before falling out of supp
 
 BACKGROUND
 ----------
-Starting with v20, Oracle will stop all further development of the NON-CDB architecture and have announced that NON-CDB will be de-supported in a future release. The CDB architecture, however, represents a radical departure from NON-CDB and many sites have cautiously stayed with their familiar NON-CDB databases. Compounding the problem, many other sites continue to maintain old database versions that are well past their extended support date. In order to encourage their clients to change, Oracle now (since 2020) permit 3 PDBs to run license-free per v19 CDB.
+The "autoMigrate" utility was developed to reduce the complexity and large number of manual tasks involved in database migration. These include, but are by no means limited to:
+
+- transporting business data from source to target, ensuring the process is restartable in the event of network failure
+- ensuring endianess compatibility of source and transported data
+- copying metadata definitions from source to target 
+- reconciling counts of the transferred data and metadata
+- gathering accurate statistics of transferred data objects
+- confirming use of any DIRECTORY objects in source that may need to be redefined in target
+- confirming use of any DATABASE LINK objects that may need to be redefined in target
+- ensuring all grants to SYS-owned objects are replayed in the target database
+
+Even for a simple database the above can represent many dozens of individual tasks that need to be prepared, coordinated and tested. 
+
+Based on the Transportable Tablesspaces feature, the autoMigrate utility reduces database migration to at most 3 steps:
+1. run the source migration sqlplus script on the source database (optionally to signal the start of a data migration process)
+2. run the target migration sqlplus script on the target database
+3. if step 1 started a migration process then run the same source migration sqlplus script to signal end of the process
+
 
 TECHNICAL DESCRIPTION
 ---------------------
