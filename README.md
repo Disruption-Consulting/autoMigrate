@@ -12,9 +12,11 @@ Migrating to a new version of Oracle database is invariably a costly and risky a
 - through sharing infrastructure resources, adoption of Multitenant significantly lowers cost of ownership
 - version 19 enables limited use of features like in-Memory at no extra license cost
 
-Essentially, all pre-19 databases need to be migrated before these fall out of support (e.g. version 11.2.0.4 ends Premier support December 2020).   
+Essentially, all pre-19 databases need to be migrated before falling out of support -
 
-Where the business demands minimal application downtime, the utility can transfer large databases over an extended period during which the application remains fully available.
+![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
+
+
 
 BACKGROUND
 ----------
