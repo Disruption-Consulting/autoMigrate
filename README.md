@@ -51,27 +51,36 @@ Scripts "src_migr.sql" and "pck_migration_src.sql" should be extracted to a suit
 Scripts "tgt_migr.sql" and "pck_migration_tgt.sql" should be extracted to a suitable filesystem on the target server, e.g. "/tmp".
 
 
-# START MIGRATION  
+## START MIGRATION  
 
 Logon to source server as "oracle" software owner or any account belonging to the "dba" group.
 
 Source the database to be migrated before running the migration script. 
 
-For example, if database SID is "WMLDEV":
+For example, if database SID is "WMLDEV" and we are migrating from AIX to LINUX
               
 ```
 export ORACLE_SID=WMLDEV
 export ORAENV_ASK=NO
 . oraenv
-
-sqlplus / as sysdba @src_migr.sql \
-    mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL|REMOVE] \
-    incr-ts-dir=/dirname \
-    incr-ts-freq=frequency \
-    user=username
 ```
-                         
-# SRC_MIGR.SQL PARAMETERS   
+
+Run the migration script "src_migr.sql" in "analyze" mode to generate a screen report with relevant details of the database to be migrated. 
+
+```
+sqlplus / as sysdba @src_migr.sql mode=ANALYZE
+```
+
+Run the migration script in "execute" mode to prepare the database for migration.
+
+```
+sqlplus / as sysdba @src_migr.sql mode=EXECUTE
+```
+
+After a short period (depends on size of database) the script will generate on screen details of how to complete the migration on the target LINUX server.
+
+
+## SCRIPT PARAMETERS   
 Parameters in *`italics`* are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
