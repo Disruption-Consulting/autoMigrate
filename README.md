@@ -109,11 +109,11 @@ SELECT * FROM migration.log ORDER BY id;
 ```
 
 
-## SCRIPT PARAMETERS   
-
-### "src_migr.sql"
+## SCRIPT COMMAND PARAMETERS   
 
 Parameters in *`italics`* are optional.
+
+### "src_migr.sql"
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
 - `ANALYZE` - show details about the database - e.g. name and size of database (DEFAULT)
@@ -136,4 +136,6 @@ Parameters in *`italics`* are optional.
 
 *`USER`*
 >Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
+
+### "tgt_migr.sql"
 
