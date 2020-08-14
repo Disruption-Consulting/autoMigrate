@@ -113,7 +113,7 @@ SELECT * FROM migration.log ORDER BY id;
 
 Parameters in *`italics`* are optional.
 
-### "src_migr.sql"
+### src_migr.sql
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
 - `ANALYZE` - show details about the database - e.g. name and size of database (DEFAULT)
@@ -137,32 +137,30 @@ Parameters in *`italics`* are optional.
 *`USER`*
 >Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
 
-### "tgt_migr.sql"
+### tgt_migr.sql
 
 `USER`   
->Name of user created on source database through which we access data and metadata via a db link.
+>Name of source database user referenced in database link. Default is MIGRATION.
 
 `HOST`
->Name of the server hosting the source database.
+>IP Address of the server hosting the source database.
+
+`SERVICE`
+>Name of the source database's listening service running in the source environment.
 
 `PORT`
 >Port on which service is registered with the listener. Default is 1521.
 
-`SERVICE`
->Name of the service running on the source database that is registered with the local listener. We use these first 4 parameters to create the database link.
-
 `PDBNAME`
->Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
+>Name of the Pluggable database (PDB) to be created in the CDB. 
   
 *`TMPDIR`*
->Directory where temporary files created during the migration should be held. Default is `/tmp`
+>Directory where generated script and log files are created. Default is `/tmp`
 
 *`OVERRIDE=[CONV-DB|XTTS-TS]`*
 - *`CONV-DB`* - forces migration by FULL logical export/import. 
-- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
+- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE. *** FOR TESTING PURPOSES ONLY ***
 
-*`ACTION=[FORCE-STOP|DEL-UNPLUG|RESTART]`*
-- *`FORCE-STOP`*  - stops the MIGRATION_JOB immediately
-- *`DEL-UNPLUG`* - if a re-run deletes any transferred data files that have not been plugged into the PDB
-- *`RESTART`* - use if restarting after network failure had interrupted a previous run
+*`ACTION=[REMOVE]`*
+- *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to refresh for example.
 
