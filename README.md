@@ -43,26 +43,35 @@ Alternatively, and by default, source data files are set to read only and theref
 For example, migrating a 10TB database over an effective network bandwith of 100GB/hour would take at least 100 elapsed hours during which the application would by default be unavailable. To mitigate such cases, the autoMigrate utility allows the application to remain fully online whilst it takes incremental data file backups which are  transfered and applied automatically to the target database; in this way, very large, active databases can be transfered over say, a week before a final incremental backup taken say, on the weekend is applied and used to complete the migration which could complete within an hour (depending on the degree of source database udate activity).
 
 
-# OPERATING NOTES
+# INSTALL AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
 
-Scripts "src_migr.sql" and "pck_migration_src.sql" should be unzippped to a suitable filesystem on the source server, e.g. "/tmp".
+Scripts "src_migr.sql" and "pck_migration_src.sql" should be extracted to a suitable filesystem on the source server, e.g. "/tmp".
 
-Scripts "tgt_migr.sql" and "pck_migration_tgt.sql" should be unzippped to a suitable filesystem on the target server, e.g. "/tmp".
-
-Logon as "oracle" software owner or any account belonging to the "dba" group and download these scripts onto a suitable filesystem.
+Scripts "tgt_migr.sql" and "pck_migration_tgt.sql" should be extracted to a suitable filesystem on the target server, e.g. "/tmp".
 
 
-# RUN COMMAND                         
+# START MIGRATION  
+
+Logon to source server as "oracle" software owner or any account belonging to the "dba" group.
+
+Source the database to be migrated before running the migration script. 
+
+For example, if database SID is "WMLDEV":
               
 ```
+export ORACLE_SID=WMLDEV
+export ORAENV_ASK=NO
+. oraenv
+
 sqlplus / as sysdba @src_migr.sql \
     mode=[ANALYZE|EXECUTE|RESET|INCR-TS|INCR-TS-FINAL|REMOVE] \
     incr-ts-dir=/dirname \
-    incr-ts-freq=frequency
+    incr-ts-freq=frequency \
+    user=username
 ```
                          
-# PARAMETERS   
+# SRC_MIGR.SQL PARAMETERS   
 Parameters in *`italics`* are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
