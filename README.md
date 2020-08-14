@@ -139,3 +139,30 @@ Parameters in *`italics`* are optional.
 
 ### "tgt_migr.sql"
 
+`USER`   
+>Name of user created on source database through which we access data and metadata via a db link.
+
+`HOST`
+>Name of the server hosting the source database.
+
+`PORT`
+>Port on which service is registered with the listener. Default is 1521.
+
+`SERVICE`
+>Name of the service running on the source database that is registered with the local listener. We use these first 4 parameters to create the database link.
+
+`PDBNAME`
+>Name of the Pluggable database (PDB) to be created in the current CDB. Will normally be the name of the source database.
+  
+*`TMPDIR`*
+>Directory where temporary files created during the migration should be held. Default is `/tmp`
+
+*`OVERRIDE=[CONV-DB|XTTS-TS]`*
+- *`CONV-DB`* - forces migration by FULL logical export/import. 
+- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE
+
+*`ACTION=[FORCE-STOP|DEL-UNPLUG|RESTART]`*
+- *`FORCE-STOP`*  - stops the MIGRATION_JOB immediately
+- *`DEL-UNPLUG`* - if a re-run deletes any transferred data files that have not been plugged into the PDB
+- *`RESTART`* - use if restarting after network failure had interrupted a previous run
+
