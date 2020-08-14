@@ -43,7 +43,7 @@ Alternatively, and by default, source data files are set to read only and theref
 For example, migrating a 10TB database over an effective network bandwith of 100GB/hour would take at least 100 elapsed hours during which the application would by default be unavailable. To mitigate such cases, the autoMigrate utility allows the application to remain fully online whilst it takes incremental data file backups which are  transfered and applied automatically to the target database; in this way, very large, active databases can be transfered over say, a week before a final incremental backup taken say, on the weekend is applied and used to complete the migration which could complete within an hour (depending on the degree of source database udate activity).
 
 
-# INSTALL AUTOMIGRATE SCRIPTS
+# AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
 
 Scripts "src_migr.sql" and "pck_migration_src.sql" should be extracted to a suitable filesystem on the source server, e.g. "/tmp".
@@ -57,7 +57,7 @@ Logon to source server as "oracle" software owner or any account belonging to th
 
 Source the database to be migrated before running the migration script. 
 
-For example, if database SID is "WMLDEV" and we are migrating from AIX to LINUX
+For the example below we are migrating database SID "WMLDEV" on AIX server with IP address  to LINUX:
               
 ```
 export ORACLE_SID=WMLDEV
@@ -79,8 +79,40 @@ sqlplus / as sysdba @src_migr.sql mode=EXECUTE
 
 After a short period (depends on size of database) the script will generate on screen details of how to complete the migration on the target LINUX server.
 
+## COMPLETE MIGRATION
+
+Logon to target server as "oracle" software owner or any account belonging to the "dba" group.
+
+Source the pre-created target CDB. For example, assume that CDB called CDBDEV has been created:
+
+```
+export ORACLE_SID=CDBDEV
+export ORAENV_ASK=NO
+. oraenv
+```
+
+Run the "tgt_migr.sql" script as indicated in the output from running "src_migr.sql" on the source server:
+
+```
+sqlplus / as sysdba @tgt_migr.sql \
+    HOST=10.1.23.124 \     # IP address of AIX source server 
+    SERVICE=WMLDEV \       # listening service name on AIX server. Usually same as SID name
+    PDBNAME=WMLDEV \       # name of target PDB to be created. Should default this to the SID of AIX source database
+    PW=FLIUTjkXX!          # password of MIGRATION schema on source database that was created by running "src_migr.sql"
+```
+
+The migration is started in the background and can be monitored either by viewing contents of log file "/tmp/migration.log" (default location) or by running this query in a tool like "sqlplus" or "sqlDeveloper":
+
+```
+ALTER SESSION SET CONTAINER=WMLDEV;
+SELECT * FROM migration.log ORDER BY id;
+```
+
 
 ## SCRIPT PARAMETERS   
+
+### "src_migr.sql"
+
 Parameters in *`italics`* are optional.
 
 `MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
