@@ -69,8 +69,9 @@ In the schematic below, running `src_migr MODE=EXECUTE` sets all application tab
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|
 ||`sqlplus / @src_migr MODE=EXECUTE`||
-|:stop_sign:||`sqlplus / @tgt_migr`|
-|:stop_sign:|| **transfer**|
+|:no_entry:||`sqlplus / @tgt_migr`|
+|:x:||`sqlplus / @tgt_migr`|
+|:repeat:|| **transfer**|
 |:stop_sign:|| **datapump**|
 |:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE|
 
