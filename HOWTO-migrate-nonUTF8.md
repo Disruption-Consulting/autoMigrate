@@ -43,6 +43,4 @@ EOF
 
 At the end of this exercise, the AL32UTF8 CDB called CDBAL32 wil contain the WE8ISO8859P9 PDB called PDBWEP9.
 
-Keep all non-AL32UTF8 CDBs created for this purpose until the end of the migration project and then delete them.
-
 There should be no space issue since RELOCATE physically moves the PDB data files. 
