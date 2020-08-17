@@ -1,7 +1,7 @@
 # BACKGROUND
 
 Since version 12.2, a CDB database created with AL32UTF8 character (default) set may now comprise PDBs with different character sets.
-However, we cannot directly migrate a non-AL32UTF8 database into a pluggable database within an AL32UTF8 CDB; we have to first migrate as a PDB to an interim CDB with the same character set and then relocate it to the target AL32UTF8 CDB.
+However, we cannot directly migrate a non-AL32UTF8 database into a pluggable database within an AL32UTF8 CDB; we have to first migrate to an interim CDB with the same character set and then relocate the PDB to the target AL32UTF8 CDB.
 
 To follow the procedure, assume:
 
@@ -34,3 +34,9 @@ CREATE PLUGGABLE DATABASE PDBWEP9 FROM PDBWEP9@CLONE_LINK RELOCATE FILE_NAME_CON
 EXIT
 EOF
 ```
+
+At the end of this exercise, the AL32UTF8 CDB called CDBAL32 wil contain the WE8ISO8859P9 PDB called PDBWEP9.
+
+Keep all non-AL32UTF8 CDBs created for this purpose until the end of the migration project and then delete them.
+
+There should be no space issue since RELOCATE physically moves the PDB data files. 
