@@ -1,7 +1,11 @@
 # BACKGROUND
 
 Since version 12.2, a CDB database created with AL32UTF8 character (default) set may now comprise PDBs with different character sets.
+
 However, we cannot directly migrate a non-AL32UTF8 database into a pluggable database within an AL32UTF8 CDB; we have to first migrate to an interim CDB with the same character set and then relocate the PDB to the target AL32UTF8 CDB.
+
+
+# PROCESS
 
 To follow the procedure, assume:
 
