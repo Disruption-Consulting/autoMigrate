@@ -1,5 +1,8 @@
 # automigrate
 Automate migration of non-CDB Oracle databases to Multitenant (CDB/PDB) architecture.
+
+This utility makes no use of extra-cost database options, like Goldengate and Active Data Guard.
+
 - Tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
 - Tested on target database versions 19.7, 19.8 
 
@@ -15,7 +18,7 @@ Migrating to a new version of Oracle database is invariably a costly and disrupt
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
 
-The "autoMigrate" utility was developed to reduce the complexity and large number of manual tasks involved in database migration. These include, but are by no means limited to:
+The "autoMigrate" utility was developed to reduce the complexity and large number of manual tasks involved in database migration. These include, but are not limited to:
 
 - transporting business data from source to target, ensuring the process is restartable in the event of network failure
 - ensuring endianess compatibility of source and transported data
@@ -25,7 +28,7 @@ The "autoMigrate" utility was developed to reduce the complexity and large numbe
 - confirming use of any DIRECTORY objects in source that may need to be redefined in target
 - confirming use of any DATABASE LINK objects that may need to be redefined in target
 - ensuring all grants to SYS-owned objects are replayed in the target database
-- ensure target tablespaces are set to their pre-migration status on the source database
+- ensure target tablespaces are set to their pre-migration status on both target and source databases
 
 Even for a simple database the above can represent many dozens of individual tasks that need to be prepared, coordinated and tested. 
 
