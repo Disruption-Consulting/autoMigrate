@@ -1,8 +1,6 @@
 BACKGROUND
 ----------
-V19 is the current terminal release of Oracle Database, providing Premier support until April 2024 and extended support until April 2027. 
-
-See "My Oracle Support" (MOS) Doc ID 742060.1 for the most up-to-date release information.
+Where an Oracle database application makes use of DB LINKS to access data in another database specific actions may be required to maintain application functionality  after the migration. In particular, where all databases are being migrated to a new platform (e.g. AIX to LINUX) and there is no bi-directional network support, migrating AIX database A that uses a db link to AIX database B will necessitate migrating both A and B to the target LINUX platform at the same time.
 
 PROCESS OVERVIEW
 ----------------
