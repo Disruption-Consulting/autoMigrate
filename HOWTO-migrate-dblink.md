@@ -1,6 +1,6 @@
-BCKGROUND
----------
-A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. For example, a session in the Database called DATAMART retrieves rows from the customer table in the SALES database by running "SELECT * FROM CLIENT.customer@SALES_LINK". The following configuration exists in order for this to work:
+BASICS
+------
+A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. Oracle refers to this as distributed processing. For example, a session in the Database called DATAMART retrieves rows from the customer table in the SALES database by running "SELECT * FROM CLIENT.customer@SALES_LINK". The following configuration exists in order for this to work:
 
 1. A user is defined in the SALES database that acts as a conduit for access to the "CLIENT.customer" table, e.g.
 
@@ -9,6 +9,14 @@ export ORACLE_SID=SALES
 
 sqlplus /nolog<<EOF
 CONNECT /AS SYSDBA
+
+Rem --------------
+Rem Best practices
+Rem --------------
+Rem Create user with least privileges to provide required access.
+Rem CREATE SESSION required is required because access via DB LINK results in this user starting a database session
+Rem
+
 CREATE USER dblink_user IDENTIFIED BY "Password12!";
 GRANT CREATE SESSION TO dblink_user;
 GRANT SELECT ON CLIENT.customer TO dblink_user;
@@ -22,13 +30,28 @@ export ORACLE_SID=DATAMART
 
 sqlplus /nolog<<EOF
 CONNECT /AS SYSDBA
+
+Rem --------------
+Rem Best practices
+Rem --------------
+Rem The following is a "private fixed user" DB LINK, which include the authentication details of the remote database user.
+Rem Note that public DB LINKs can be created giving access to ALL users in the database - these are strongly ill-advised owing to the security risk
+Rem
+Rem The USING clause refers to a TNS alias entry in the DATAMART's tnsnames.ora network configuration file. 
+Rem
+
 ALTER SESSION SET CURRENT_SCHEMA=sales_schema;
 CREATE DATABASE LINK SALES_LINK CONNECT TO dblink_user IDENTIFIED BY "Password12!" USING 'SALES_DATA_SERVICE';
+EOF
 ```
 
 3. An entry in DATAMART's "tnsnames.ora" network file includes an identically named tns alias entry "SALES_DATA_SERVICE", e.g.
 
 ```
+# Best Practice
+# -------------
+# Note the use of a generic name describing the service, rather than the database name - this greatly simplifies TEST to PRODUCTION code deployments
+
 SALES_DATA_SERVICE=(
   DESCRIPTION=
   (ADDRESS_LIST=(ADDRESS=(PROTOCOL=tcp)(HOST=10.1.25.21)(PORT=1521)))
