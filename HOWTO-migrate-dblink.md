@@ -14,7 +14,7 @@ Rem --------------
 Rem Best practices
 Rem --------------
 Rem Create user with least privileges to provide required access.
-Rem CREATE SESSION required is required because access via DB LINK results in this user starting a database session
+Rem CREATE SESSION privilege is required because access via DB LINK results in this user starting a database session
 Rem
 
 CREATE USER dblink_user IDENTIFIED BY "Password12!";
@@ -34,38 +34,46 @@ CONNECT /AS SYSDBA
 Rem --------------
 Rem Best practices
 Rem --------------
-Rem The following is a "private fixed user" DB LINK, which include the authentication details of the remote database user.
+Rem The following is a "private fixed user" DB LINK, which includes the authentication details of the remote database user.
 Rem
-Rem The USING clause refers to a TNS alias entry in the DATAMART's tnsnames.ora network configuration file. 
-Rem CREATE PUBLIC DATABASE LINK is strongly ill-advised - it provides access to ALL database users.
+Rem The USING clause refers to a TNS alias entry in the DATAMART's tnsnames.ora network configuration file. Note that he TNS entry or
+Rem EZ Naming syntax can also be employed as in the equivalent USING '//10.1.25.21/SALES' - however, as explained below, this is
+Rem not advised as it will cause unnecessary additional effort when deploying to other environments.
+Rem
+Rem Note that CREATE PUBLIC DATABASE LINK is strongly ill-advised as it enables access to ALL database users.
+Rem
+Rem When issuing a DML statement that references a DB LINK, Oracle checks whether the name of the DB LINK starts with the remote GLOBAL NAME of the database.
+Rem If the remote database has set the initialization parameter GLOBAL_NAMES=TRUE, which is Oracle's recommendation, then the DB LINK must at least include the remote database's global name. 
 
 ALTER SESSION SET CURRENT_SCHEMA=sales_schema;
 CREATE DATABASE LINK SALES_LINK CONNECT TO dblink_user IDENTIFIED BY "Password12!" USING 'SALES_DATA_SERVICE';
-
-
 EOF
 ```
 
-3. An entry in DATAMART's "tnsnames.ora" network file includes an identically named tns alias entry "SALES_DATA_SERVICE", e.g.
+3. An entry in DATAMART's "tnsnames.ora" network configuration file includes an identically named tns alias entry 
+"SALES_DATA_SERVICE", e.g.
 
 ```
 # Best Practice
 # -------------
 # Note the use of a generic name describing the service, rather than the database name - this greatly simplifies  
-# code deployments in environments where the database naming standards includes a string denoting Test / UAT / Production.
+# code deployments in organizations where database naming standards requires denoting the environment (e.g. D, T, P)
 
 SALES_DATA_SERVICE=(
   DESCRIPTION=
   (ADDRESS_LIST=(ADDRESS=(PROTOCOL=tcp)(HOST=10.1.25.21)(PORT=1521)))
 	(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SALES)))
 ```
+Test connectivity using the "tnsping" utlility:
+```
+$ tnsping SALES_DATA_SERVICE
+```
 
-While DATAPUMP migrates DB LINK definitions, it does not confirm that they are actually used. Auditing sessions in the database enables us to monitor all  connections and thereby identify DB LINK usage. Ideally, *ALL* databases in the landscape should be audited for incoming connections as a minimum. 
-
-remains  an Oracle database application makes use of DB LINKS to access data in another database specific actions may be required to maintain application functionality  after the migration. In particular, where all databases are being migrated to a new platform (e.g. AIX to LINUX) and there is no bi-directional network support, migrating AIX database A that uses a db link to AIX database B will necessitate migrating both A and B to the target LINUX platform at the same time.
 
 ANALYZE DB LINK USAGE
 ---------------------
+As noted above, use of a DB LINK in a SELECT statement (or indeed, any authorized DML statement) starts a database session in the remote database.
+
 If a database has implemented AUDIT SESSION, monitoring DB LINK usage is as simple as
 
 ```
