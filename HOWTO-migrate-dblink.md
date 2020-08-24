@@ -35,13 +35,14 @@ Rem --------------
 Rem Best practices
 Rem --------------
 Rem The following is a "private fixed user" DB LINK, which include the authentication details of the remote database user.
-Rem Note that public DB LINKs can be created giving access to ALL users in the database - these are strongly ill-advised owing to the security risk
 Rem
 Rem The USING clause refers to a TNS alias entry in the DATAMART's tnsnames.ora network configuration file. 
-Rem
+Rem CREATE PUBLIC DATABASE LINK is strongly ill-advised - it provides access to ALL database users.
 
 ALTER SESSION SET CURRENT_SCHEMA=sales_schema;
 CREATE DATABASE LINK SALES_LINK CONNECT TO dblink_user IDENTIFIED BY "Password12!" USING 'SALES_DATA_SERVICE';
+
+
 EOF
 ```
 
@@ -50,7 +51,8 @@ EOF
 ```
 # Best Practice
 # -------------
-# Note the use of a generic name describing the service, rather than the database name - this greatly simplifies TEST to PRODUCTION code deployments
+# Note the use of a generic name describing the service, rather than the database name - this greatly simplifies  
+# code deployments in environments where the database naming standards includes a string denoting Test / UAT / Production.
 
 SALES_DATA_SERVICE=(
   DESCRIPTION=
