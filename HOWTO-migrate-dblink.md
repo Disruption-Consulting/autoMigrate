@@ -1,11 +1,11 @@
 BASICS
 ------
-A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. Oracle refers to this as distributed processing. For example, a session in the Database called DATAMART retrieves rows from the customer table in the SALES database by running "SELECT * FROM CLIENT.customer@SALES_LINK". The following configuration exists in order for this to work:
+A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. Oracle refers to this as distributed processing. For example, a session in the Database called DMPROD retrieves rows from the customer table in the SLSPROD database by running "SELECT * FROM CLIENT.customer@SALES_LINK". The following configuration exists in order for this to work:
 
-1. A user is defined in the SALES database that acts as a conduit for access to the "CLIENT.customer" table, e.g.
+1. A user is defined in the SLSPROD database that acts as a conduit for access to the "CLIENT.customer" table, e.g.
 
 ```
-export ORACLE_SID=SALES
+export ORACLE_SID=SLSPROD
 
 sqlplus /nolog<<EOF
 CONNECT /AS SYSDBA
@@ -23,10 +23,10 @@ GRANT SELECT ON CLIENT.customer TO dblink_user;
 EOF
 ```
 
-2. A DB LINK called "SALES_LINK" is created in the DATAMART database 
+2. A DB LINK called "SALES_LINK" is created in the DMPROD database 
 
 ```
-export ORACLE_SID=DATAMART
+export ORACLE_SID=DMPROD
 
 sqlplus /nolog<<EOF
 CONNECT /AS SYSDBA
@@ -36,11 +36,11 @@ Rem Best practices
 Rem --------------
 Rem The following is a "private fixed user" DB LINK, which includes the authentication details of the remote database user.
 Rem
-Rem The USING clause refers to a TNS alias entry in the DATAMART's tnsnames.ora network configuration file. Note that he TNS entry or
-Rem EZ Naming syntax can also be employed as in the equivalent USING '//10.1.25.21/SALES' - however, as explained below, this is
-Rem not advised as it will cause unnecessary additional effort when deploying to other environments.
+Rem The USING clause refers to a TNS alias entry in DMPROD's tnsnames.ora network configuration file. Note that he TNS entry or
+Rem EZ Naming syntax can also be employed as in the equivalent USING '//10.1.25.21/SLSPROD' - however, as explained below, this is
+Rem not advised as it will cause unnecessary additional effort when deploying to other environments - e.g. from SLSTEST to SLSPROD.
 Rem
-Rem Note that CREATE PUBLIC DATABASE LINK is strongly ill-advised as it enables access to ALL database users.
+Rem Note that CREATE PUBLIC DATABASE LINK is strongly ill-advised as it enables ALL database users to access.
 Rem
 Rem When issuing a DML statement that references a DB LINK, Oracle checks whether the name of the DB LINK starts with the remote GLOBAL NAME of the database.
 Rem If the remote database has set the initialization parameter GLOBAL_NAMES=TRUE, which is Oracle's recommendation, then the DB LINK must at least include the remote database's global name. 
@@ -50,7 +50,7 @@ CREATE DATABASE LINK SALES_LINK CONNECT TO dblink_user IDENTIFIED BY "Password12
 EOF
 ```
 
-3. An entry in DATAMART's "tnsnames.ora" network configuration file includes an identically named tns alias entry 
+3. An entry in DMPROD's "tnsnames.ora" network configuration file includes an identically named tns alias entry 
 "SALES_DATA_SERVICE", e.g.
 
 ```
@@ -62,17 +62,29 @@ EOF
 SALES_DATA_SERVICE=(
   DESCRIPTION=
   (ADDRESS_LIST=(ADDRESS=(PROTOCOL=tcp)(HOST=10.1.25.21)(PORT=1521)))
-	(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SALES)))
+	(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=SLSPROD)))
 ```
 Test connectivity using the "tnsping" utlility:
 ```
 $ tnsping SALES_DATA_SERVICE
+TNS Ping Utility for Linux: Version 11.2.0.4.0 - Production on 24-AUG-2020 13:53:27
+
+Copyright (c) 1997, 2016, Oracle.  All rights reserved.
+
+Used parameter files:
+
+
+Used TNSNAMES adapter to resolve the alias
+Attempting to contact ( DESCRIPTION=( ADDRESS_LIST= (ADDRESS= (PROTOCOL = tcp) (HOST = 10.1.25.21) ( PORT=1521))) (CONNECT_DATA= (SERVER=DEDICATED)(SERVICE_NAME=SLSPROD)))
+OK (0 msec)
 ```
 
 
 ANALYZE DB LINK USAGE
 ---------------------
-As noted above, use of a DB LINK in a SELECT statement (or indeed, any authorized DML statement) starts a database session in the remote database.
+The autoMigrate "src_migr.sql" script lists all DB LINKs defined in the database with an indication of whether the link is functional.
+
+In the first instance, this should be discussed with the Application owners to confirm that listed DB LINKs are indeed required
 
 If a database has implemented AUDIT SESSION, monitoring DB LINK usage is as simple as
 
