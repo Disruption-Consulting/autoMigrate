@@ -1,21 +1,22 @@
 # automigrate
-Automate migration of non-CDB Oracle databases to Multitenant (CDB/PDB) architecture.
+Series of scripts developed to reduce the effort and cost involved in migrating Oracle databases to version 19.
 
-This utility avoids use of extra-cost database options, like Goldengate and Active Data Guard.
+- running 2 scripts optimally migrates a non-CDB database to a Pluggable database (PDB)
+- no use of extra-cost options, like Goldengate and Active Data Guard
+- tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
+- tested on target database versions 19.7, 19.8 
 
-- Tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
-- Tested on target database versions 19.7, 19.8 
-
-Reference: https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
 
 # OVERVIEW
 
-Migrating to a new version of Oracle database can be a costly and disruptive affair, which most organizations avoid for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to the current terminal release - version 19:
-- Oracle no longer supports the non-Multitenant architecture, i.e. non-CDB, as of version 20
-- Oracle offers 3 PDBs per CDB license-free
+Migrating or even upgrading Oracle database can be a costly and disruptive project, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to the current terminal release - version 19:
+
+- as of version 20 non-CDB will no longer be supported by Oracle
+- Oracle announced at the end of 2019 that customers may run 3 PDBs per CDB license-free
 - version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
-- adoption of Multitenant significantly lowers the total cost of ownership
+- adoption of Multitenant architecture significantly lowers the total cost of ownership
 - version 19 enables features like in-Memory at no extra license cost which can drastically reduce elapsed times of some queries
+- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud infrastructure gathers momentum
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
@@ -34,7 +35,7 @@ The "autoMigrate" utility was developed to reduce the complexity and large numbe
 
 Even for a small database preparing, coordinating and testing all of these individual tasks requires a significant effort involving Business owners and technology service providers. The autoMigrate utility typically involves running one script on both source and target databases which will securely and optimally execute all of the above tasks. 
 
-Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. 
+Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. Ref. https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
 
