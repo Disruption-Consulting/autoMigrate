@@ -32,13 +32,9 @@ The "autoMigrate" utility was developed to reduce the complexity and large numbe
 - ensuring all grants to SYS-owned source database objects are replayed in the target database
 - ensuring both target and source tablespaces are set to their pre-migration status on completion
 
-Even for a simple database the above can represent many dozens of individual tasks that need to be prepared, coordinated and tested. 
+Even for a small database preparing, coordinating and testing all of these individual tasks requires a significant effort involving Business owners and technology service providers. The autoMigrate utility typically involves running one script on both source and target databases which will securely and optimally execute all of the above tasks. 
 
-Based on the Transportable Tablespace feature, available from version 10.1.0.3, the autoMigrate utility involves at most 3 manual interventions:
-
-1. run sqlplus script on the source database, optionally signalling the start of an extended data migration process
-2. run sqlplus script on the target database
-3. if step 1 started an extended data migration process then run the same script on the source database to signal the end of the process
+Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. 
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
 
