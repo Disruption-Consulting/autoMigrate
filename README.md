@@ -160,6 +160,6 @@ Parameters in *`italics`* are optional.
 - *`CONV-DB`* - forces migration by FULL logical export/import. 
 - *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE. *** FOR TESTING PURPOSES ONLY ***
 
-*`ACTION=[REMOVE]`*
-- *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to refresh for example.
+*`MODE=[REMOVE]`*
+- *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to a complete database refresh for example.
 
