@@ -1,17 +1,16 @@
 # automigrate
-Series of scripts developed to reduce the effort and cost involved in migrating Oracle databases to version 19.
+Two scripts developed to reduce the effort and cost involved in migrating Oracle databases to the current terminal release - version 19.
 
-- running 2 scripts optimally migrates a non-CDB database to a Pluggable database (PDB)
 - no use of extra-cost options, like Goldengate and Active Data Guard
 - tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
-- tested on target database versions 19.7, 19.8 
+- tested on target database versions 19.3 through 19.8 
 
 
 # OVERVIEW
 
-Migrating or even upgrading Oracle database can be a costly and disruptive project, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to the current terminal release - version 19:
+Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to version 19:
 
-- as of version 20 non-CDB will no longer be supported by Oracle
+- starting with version 20 non-CDB will no longer be supported by Oracle
 - Oracle announced at the end of 2019 that customers may run 3 PDBs per CDB license-free
 - version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
 - adoption of Multitenant architecture significantly lowers the total cost of ownership
@@ -21,7 +20,7 @@ Migrating or even upgrading Oracle database can be a costly and disruptive proje
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
 
-The "autoMigrate" utility was developed to reduce the complexity and large number of manual tasks involved in database migration, including:
+The "autoMigrate" utility was developed to provide a repeatable, coherent framework for executing the large number of tasks involved in database migration, including:
 
 - transporting business data from source to target, ensuring the process is restartable in the event of network failure
 - ensuring endianess compatibility of source and transported data
@@ -30,12 +29,11 @@ The "autoMigrate" utility was developed to reduce the complexity and large numbe
 - gathering accurate statistics of transferred data objects
 - confirming use of any DIRECTORY objects in source that may need to be redefined in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
-- ensuring all grants to SYS-owned source database objects are replayed in the target database
+- ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring both target and source tablespaces are set to their pre-migration status on completion
 
-Even for a small database preparing, coordinating and testing all of these individual tasks requires a significant effort involving Business owners and technology service providers. The autoMigrate utility typically involves running one script on both source and target databases which will securely and optimally execute all of the above tasks. 
 
-Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. Ref. https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
+Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. 
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
 
@@ -56,10 +54,10 @@ Logon to source server as "oracle" software owner or any account belonging to th
 
 Source the database to be migrated before running the migration script. 
 
-For the example below we are migrating database SID "WMLDEV" on AIX server with IP address  to LINUX:
+For all examples in this project we are migrating a database with SID "AIXDB" on AIX server to LINUX:
               
 ```
-export ORACLE_SID=WMLDEV
+export ORACLE_SID=AIXDB
 export ORAENV_ASK=NO
 . oraenv
 ```
@@ -163,3 +161,8 @@ Parameters in *`italics`* are optional.
 *`MODE=[REMOVE]`*
 - *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to a complete database refresh for example.
 
+# APPENDIX
+
+## REFERENCES
+
+https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
