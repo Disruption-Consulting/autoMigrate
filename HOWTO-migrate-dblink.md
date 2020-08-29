@@ -1,8 +1,10 @@
 BASICS
 ------
-A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. Oracle refers to this as distributed processing. For example, a session in the Database called DMPROD retrieves rows from the customer table in the SLSPROD database by running "SELECT * FROM CLIENT.customer@SALES_LINK". The following configuration exists in order for this to work:
+A DB LINK is a database object that enables a session in one database to access tables, views and run procedures in another database. Oracle refers to this as distributed processing. 
 
-1. A user is defined in the SLSPROD database that acts as a conduit for access to the "CLIENT.customer" table, e.g.
+For example, a session in the Database called DMPROD retrieves rows from the customer table in the SLSPROD database by running "SELECT * FROM SALES.CUSTOMER@SALES_LINK". The following configuration exists in order for this to work:
+
+1. A user is defined in the SLSPROD database that acts as a conduit for access to the "SALES.CUSTOMER" table, e.g.
 
 ```
 export ORACLE_SID=SLSPROD
