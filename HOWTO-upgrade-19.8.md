@@ -7,7 +7,7 @@ See "My Oracle Support" (MOS) Doc ID 742060.1 for the most up-to-date release in
 PROCESS OVERVIEW
 ----------------
 1. Download Oracle v19 software from MOS
-2. Create new v19 home directory and unzip download
+2. Create new v19 home directory and unzip downloaded v19 zip file
 3. Download latest OPatch utility and replace in v19 home
 4. Download 19.8 patchset and install (this is the latest patchset issued July 2020)
 5. Create a v19.8 Container Database (CDB) with "dbca" from the new Oracle home
