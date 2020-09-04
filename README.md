@@ -11,18 +11,18 @@ Two scripts developed to reduce the effort and cost to migrate Oracle databases 
 Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to version 19:
 
 - starting with version 20 non-CDB will no longer be supported by Oracle
-- Oracle announced at the end of 2019 that customers may run 3 PDBs per CDB license-free
+- you can now run 3 PDBs per CDB license-free
 - version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
 - adoption of Multitenant architecture significantly lowers the total cost of ownership
-- version 19 enables features like in-Memory at no extra license cost which can drastically reduce elapsed times of some queries
-- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud infrastructure gathers momentum
+- version 19 enables limited but cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
+- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud infrastructure continues to gather momentum
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
 
 The "autoMigrate" utility was developed to provide a repeatable, coherent framework for executing the large number of tasks involved in database migration, including:
 
-- transporting business data from source to target, ensuring the process is restartable in the event of network failure
+- transporting application data from source to target as an easily restartable process in the event of network failure for example
 - ensuring endianess compatibility of source and transported data
 - copying metadata definitions from source to target 
 - reconciling counts of the transferred data and metadata
@@ -30,10 +30,13 @@ The "autoMigrate" utility was developed to provide a repeatable, coherent framew
 - confirming use of any DIRECTORY objects in source that may need to be redefined in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
-- ensuring both target and source tablespaces are set to their pre-migration status on completion
+- ensuring tablespaces are set to their pre-migration status on completion
 
 
-Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. databases at version 11.2.0.3 and more are migrated using Full Transportable Database, while all others use Transportable Tablespace. 
+Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA whereas Transportable Tablespace only migrates DATA; however, the autoMigrate scripts automatically make that determination and proceed accordingly.
+
+
+
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
 
@@ -78,7 +81,7 @@ After a short period (depends on size of database) the script will generate on s
 
 ## COMPLETE MIGRATION
 
-Logon to target server as "oracle" software owner or any account belonging to the "dba" group.
+Logon to target server as "oracle" software owner or any account belonging to the "dba" OS group.
 
 Source the pre-created target CDB. For example, assume that CDB called CDBDEV has been created:
 
