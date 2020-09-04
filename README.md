@@ -32,15 +32,16 @@ The "autoMigrate" utility was developed to provide a repeatable, coherent framew
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-Assuming an effective network bandwith of 100GB/hour, a typical migration with aotoMigrate involves 2 interventions - once on source and once on target:
+Assuming an effective network bandwith of 100GB/hour, migrating a 1 TB database involves 2 interventions - once on source and once on target - with the database remaining unavailable for 11 hours:
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
-|:white_check_mark:|5 mins|`sqlplus @src_migr \mode=EXECUTE`||
+|:white_check_mark:||START MIGRATION||
+|:no_entry:|5 mins|`sqlplus @src_migr \mode=EXECUTE`||
 |:no_entry:|5 mins||`sqlplus @tgt_migr`|
-|:no_entry:|10 hours||**...TRANFER APPLICATION DATA**|
+|:no_entry:|10 hours||**...TRANFER DATA**|
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
-|:no_entry:|10 mins|**...POST-MIGRATION TASKS**|
+|:no_entry:|10 mins||**...POST-MIGRATION TASKS**|
 |:white_check_mark:|TOTAL 11 hours|MIGRATION COMPLETE||
 
 Note that migrating this 1 TB database leaves the Production database unavailable for 11 hours. 
