@@ -1,5 +1,5 @@
 # automigrate
-Two scripts developed to reduce the effort and cost involved in migrating Oracle databases to the current terminal release - version 19.
+Two scripts developed to reduce the effort and cost to migrate Oracle databases to the current terminal version 19 release.
 
 - no use of extra-cost options, like Goldengate and Active Data Guard
 - tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
