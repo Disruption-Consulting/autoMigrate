@@ -36,6 +36,14 @@ The "autoMigrate" utility was developed to provide a repeatable, coherent framew
 Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA whereas Transportable Tablespace only migrates DATA; however, the autoMigrate scripts automatically make that determination and proceed accordingly.
 
 
+|AVAILABLE|SOURCE DATABASE|TARGET DATABASE|REMARKS|
+|:---:|--|--|--|
+|:white_check_mark:|`sqlplus / @src_migr MODE=ANALYZE`||Shows relevant source database details|
+|:no_entry:|`sqlplus / @src_migr MODE=EXECUTE`||Sets Application tablespaces to Read Only|
+|:no_entry:||`sqlplus / @tgt_migr`|Starts migration process|
+|:x:||**TRANFER DATA**||
+|:stop_sign:||**TRANSFER METADATA**||
+|:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE||
 
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
