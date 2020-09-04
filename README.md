@@ -38,11 +38,12 @@ Based on the Transportable Tablespace feature, autoMigrate runs the optimal data
 
 |AVAILABLE|SOURCE DATABASE|TARGET DATABASE|REMARKS|
 |:---:|--|--|--|
-|:white_check_mark:|`sqlplus / @src_migr MODE=ANALYZE`||Shows relevant source database details|
-|:no_entry:|`sqlplus / @src_migr MODE=EXECUTE`||Sets Application tablespaces to Read Only|
-|:no_entry:||`sqlplus / @tgt_migr`|Starts migration process|
-|:x:||**TRANFER DATA**||
-|:stop_sign:||**TRANSFER METADATA**||
+|:white_check_mark:|`sqlplus / @src_migr MODE=ANALYZE`||*Shows relevant source database details*|
+|:no_entry:|`sqlplus / @src_migr MODE=EXECUTE`||*Application tablespaces set Read Only*|
+|:no_entry:||`sqlplus / @tgt_migr`|*Start migration:|
+|:no_entry:||**TRANFER DATA**||
+|:no_entry:||**TRANSFER METADATA**||
+|:no_entry:||**POST-MIGRATION TASKS**|e.g. gather statistics, grants of SYS-owned objects*|
 |:white_check_mark:|MIGRATION COMPLETE|MIGRATION COMPLETE||
 
 
@@ -167,7 +168,7 @@ Parameters in *`italics`* are optional.
 
 *`OVERRIDE=[CONV-DB|XTTS-TS]`*
 - *`CONV-DB`* - forces migration by FULL logical export/import. 
-- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE rather than TRANSPORTABLE DATABASE. *** FOR TESTING PURPOSES ONLY ***
+- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE. *** FOR TESTING ONLY ***
 
 *`MODE=[REMOVE]`*
 - *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to a complete database refresh for example.
