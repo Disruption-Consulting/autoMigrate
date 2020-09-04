@@ -32,21 +32,18 @@ The "autoMigrate" utility was developed to provide a repeatable, coherent framew
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-Let's assume the following:
-- migrating 1TB 11.2.0.4 database named AIXDB to 19.8 Pluggable database named LINUXDB
-- effective network bandwith is 100GB/hour
-
-
+Assuming an effective network bandwith of 100GB/hour, a typical migration with aotoMigrate involves 2 interventions - once on source and once on target:
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
-|:white_check_mark:|5 mins|`sqlplus / @src_migr`||
-|:no_entry:|5 mins|`sqlplus / @tgt_migr`|
-|:no_entry:|10 hours||**TRANFER APPLICATION DATA**|
-|:no_entry:|30 mins||**TRANSFER METADATA**|
-|:no_entry:|30 mins|**POST-MIGRATION TASKS**|
-|:white_check_mark:|TOTAL 11 hours 10 minutes|MIGRATION COMPLETE||
+|:white_check_mark:|5 mins|`sqlplus @src_migr \mode=EXECUTE`||
+|:no_entry:|5 mins||`sqlplus @tgt_migr`|
+|:no_entry:|10 hours||**...TRANFER APPLICATION DATA**|
+|:no_entry:|30 mins||**...TRANSFER METADATA**|
+|:no_entry:|10 mins|**...POST-MIGRATION TASKS**|
+|:white_check_mark:|TOTAL 11 hours|MIGRATION COMPLETE||
 
+Note that migrating this 1 TB database leaves the Production database unavailable for 11 hours. 
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
 
