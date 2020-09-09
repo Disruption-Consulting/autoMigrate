@@ -178,3 +178,5 @@ Parameters in *`italics`* are optional.
 ## REFERENCES
 
 https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
+
+https://www.oracle.com/technetwork/database/features/availability/maa-wp-11g-upgradetts-132620.pdf
