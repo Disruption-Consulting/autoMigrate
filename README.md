@@ -1,17 +1,16 @@
 # automigrate
-Two scripts developed to reduce the effort and cost to migrate Oracle databases to the current terminal version 19 release.
+Simple solution to reduce the effort and cost migrating Oracle databases to the current terminal version 19 release.
 
 - no use of extra-cost options, like Goldengate and Active Data Guard
-- tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3
-- tested on target database versions 19.3 through 19.8 
-
+- tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
+- tested on target database versions 19.3 through 19.8 (CDB)
 
 # OVERVIEW
 
 Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that now make it incumbent on Oracle customers to migrate to version 19:
 
-- starting with version 20 non-CDB will no longer be supported by Oracle
-- you can now run 3 PDBs per CDB license-free
+- starting with version 20 Oracle will only support Multitenant architecture (CDB)
+- you can now run 3 PDBs per CDB license-free starting version 19
 - version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
 - adoption of Multitenant architecture significantly lowers the total cost of ownership
 - version 19 enables limited but cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
