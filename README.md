@@ -38,22 +38,28 @@ A key advantage offered by autoMigrate is fully integrated functionality to migr
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:no_entry:|5 mins|`sqlplus @src_migr \mode=EXECUTE`||
+|:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|5 mins||`sqlplus @tgt_migr`|
 |:no_entry:|10 hours||**...TRANFER DATA**|
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
 |:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
 |:no_entry:|TOTAL 11 hours|||
-|:white_check_mark:|TOTAL 11 hours|**MIGRATION COMPLETE**||
+|:white_check_mark:|||**MIGRATION COMPLETE**|
 
-In such cases, autoMigrate allows the data to be transferred in the background whilst the Production application remains fully available. 
-Note that migrating this 1 TB database leaves the Production database unavailable for 11 hours. 
+To mitigate such cases, the autoMigrate utility allows the Production application to remain fully available whilst it takes regular incremental data file backups in the background. It then transfers and applies these to the target database rolling it forward to near-synchronicity with the source database. In this way, the same 10 TB database would be mostly transferred before being set to read only for a final incremental backup.
 
-An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
+|APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
+|:---:|--|--|--|
+|:white_check_mark:||**START MIGRATION**||
+|:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
+|:white_check_mark:|5 mins||`sqlplus @tgt_migr`|
+|:white_check_mark:|10 hours||**...TRANFER DATA**|
+|:no_entry:|30 mins||**...TRANSFER METADATA**|
+|:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
+|:no_entry:|TOTAL 1 hour|||
+|:white_check_mark:|||**MIGRATION COMPLETE**|
 
-For example, migrating a 10TB database over an effective network bandwith of 100GB/hour would take at least 100 elapsed hours during which the application would by default be unavailable. To mitigate such cases, the autoMigrate utility allows the application to remain fully online whilst it takes incremental data file backups which are  transfered and applied automatically to the target database; in this way, very large, active databases can be transfered over say, a week before a final incremental backup taken say, on the weekend is applied and used to complete the migration which could complete within an hour (depending on the degree of source database udate activity).
-
-Based on the Transportable Tablespace feature, autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA whereas Transportable Tablespace only migrates DATA; however, the autoMigrate scripts automatically make that determination and proceed accordingly.
+autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace requires 3 separate datapump runs.
 
 # AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
