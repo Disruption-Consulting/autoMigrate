@@ -54,6 +54,7 @@ To mitigate such cases, the autoMigrate utility allows the Production applicatio
 |:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
 |:white_check_mark:|5 mins||`sqlplus @tgt_migr`|
 |:white_check_mark:|10 hours||**...TRANFER DATA**|
+|:no_entry:|10 mins|`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
 |:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
 |:no_entry:|TOTAL 1 hour|||
