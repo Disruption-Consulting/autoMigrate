@@ -43,7 +43,7 @@ A key advantage offered by autoMigrate is fully integrated functionality to migr
 |:no_entry:|10 hours||**...TRANFER DATA**|
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
 |:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
-|:no_entry:|TOTAL 11 hours|||
+|:no_entry:|TOTAL **11 hours**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
 To mitigate such cases, the autoMigrate utility allows the Production application to remain fully available whilst it takes regular incremental data file backups in the background. It then transfers and applies these to the target database rolling it forward to near-synchronicity with the source database. In this way, the same 10 TB database would be mostly transferred before being set to read only for a final incremental backup.
@@ -54,13 +54,15 @@ To mitigate such cases, the autoMigrate utility allows the Production applicatio
 |:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
 |:white_check_mark:|5 mins||`sqlplus @tgt_migr`|
 |:white_check_mark:|10 hours||**...TRANFER DATA**|
-|:no_entry:|10 mins|`sqlplus @src_migr mode=EXECUTE`||
+|:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
+|:no_entry:|5 mins||**...FINAL TRANFER DATA**|
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
 |:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
-|:no_entry:|TOTAL 1 hour|||
+|:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace requires 3 separate datapump runs.
+autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace is a more complex process that requires 3 separate datapump runs. N.b. the 10.1.0.3 limitation applies only to cross-platform migrations; where source and targets are endianness compatible even version 8 can be migrated using TTS.
+
 
 # AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
