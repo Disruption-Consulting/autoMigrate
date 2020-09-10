@@ -11,7 +11,8 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 
 - starting with version 20 Oracle will only support Multitenant architecture (CDB)
 - you can now run 3 PDBs per CDB license-free starting version 19
-- version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
+- version 19 has the longest support timeframe
+- pre version 19 databases are reaching end-of-life
 - adoption of Multitenant architecture significantly lowers the total cost of ownership
 - version 19 enables limited but cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
 - some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud continues to gather momentum
@@ -31,20 +32,21 @@ The "autoMigrate" utility was developed to provide a repeatable framework for se
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-A key advantage offered by autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata; migrating a 10 TB database would take more than 4 days to migrate. In such cases, autoMigrate allows the data to be transferred in the background whilst the Production application remains fully available. 
-
+A key advantage offered by autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata; migrating a 10 TB database would take more than 4 days to migrate. 
 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
-|:white_check_mark:||START MIGRATION||
+|:white_check_mark:||**START MIGRATION**||
 |:no_entry:|5 mins|`sqlplus @src_migr \mode=EXECUTE`||
 |:no_entry:|5 mins||`sqlplus @tgt_migr`|
 |:no_entry:|10 hours||**...TRANFER DATA**|
 |:no_entry:|30 mins||**...TRANSFER METADATA**|
-|:no_entry:|10 mins||**...POST-MIGRATION TASKS**|
-|:white_check_mark:|TOTAL 11 hours|MIGRATION COMPLETE||
+|:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
+|:no_entry:|TOTAL 11 hours|||
+|:white_check_mark:|TOTAL 11 hours|**MIGRATION COMPLETE**||
 
+In such cases, autoMigrate allows the data to be transferred in the background whilst the Production application remains fully available. 
 Note that migrating this 1 TB database leaves the Production database unavailable for 11 hours. 
 
 An "extended data migration process" is a phased transfer to the target server during which the source database remains fully available; the default process sets all application tablespaces to read only before starting the transfer.
@@ -130,19 +132,17 @@ Parameters in *`italics`* are optional.
   
 - `EXECUTE` - prepares database for direct migration - i.e. sets all application tablespaces to read only
 
-- `INCR-TS` - starts migration by taking incremental backups in a background job. Tablespaces remain online
-                     
-- `INCR-TS-FINAL` - sets all tablespaces to read only before taking a final incremental backup
+- `INCR` - starts migration by taking incremental backups in a background job. Tablespaces remain online
   
 - `RESET` - sets tablespaces back to their pre-migration status
 
 - `REMOVE` - remove all database objects and any backups created for the migration
                            
-*`INCR-TS-DIR`*
->directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR-TS`
+*`BKPDIR`*
+>directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR`
   
-*`INCR-TS-FREQ`*
->frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`INCR-TS-FREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
+*`BKPFREQ`*
+>frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`BKPFREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
 
 *`USER`*
 >Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
@@ -163,13 +163,10 @@ Parameters in *`italics`* are optional.
 
 `PDBNAME`
 >Name of the Pluggable database (PDB) to be created in the CDB. 
-  
-*`TMPDIR`*
->Directory where generated script and log files are created. Default is `/tmp`
 
-*`OVERRIDE=[CONV-DB|XTTS-TS]`*
-- *`CONV-DB`* - forces migration by FULL logical export/import. 
-- *`XTTS-TS`* - forces migration by TRANSPORTABLE TABLESPACE. *** FOR TESTING ONLY ***
+*`OPTIONS=[TTS,NOSTATS]`*
+- *`NOSTATS`* - Does **not** gather statistics after migration. 
+- *`TTS`* - forces migration by TRANSPORTABLE TABLESPACE. *** FOR TESTING ONLY ***
 
 *`MODE=[REMOVE]`*
 - *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to a complete database refresh for example.
