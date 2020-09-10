@@ -14,24 +14,26 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 - version 19 has the longest support timeframe (see diagram below from the Oracle Support site)
 - adoption of Multitenant architecture significantly lowers the total cost of ownership
 - version 19 enables limited but cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
-- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud infrastructure continues to gather momentum
+- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud continues to gather momentum
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
 
-The "autoMigrate" utility was developed to provide a repeatable, coherent framework for executing the large number of tasks involved in database migration, including:
+The "autoMigrate" utility was developed to provide a repeatable framework for securely coordinating the large number of tasks involved in database migration, including:
 
-- transporting application data from source to target as an easily restartable process in the event of network failure for example
-- ensuring endianess compatibility of source and transported data
+- transporting application data from source to target as an easily restartable process in the event of network or systems failure
+- ensuring endianess compatibility of source and target data
 - copying metadata definitions from source to target 
-- reconciling counts of the transferred data and metadata
+- reconciling transferred data and metadata
 - gathering accurate statistics of transferred data objects
 - confirming use of any DIRECTORY objects in source that may need to be redefined in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-Assuming an effective network bandwith of 100GB/hour, migrating a 1 TB database involves 2 interventions - once on source and once on target - with the database remaining unavailable for 11 hours:
+A key advantage offered by autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata; migrating a 10 TB database would take more than 4 days to migrate. In such cases, autoMigrate allows the data to be transferred in the background whilst the Production application remains fully available. 
+
+
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
