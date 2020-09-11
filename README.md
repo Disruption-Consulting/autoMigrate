@@ -1,21 +1,24 @@
 # automigrate
-Mature solution that reduces the effort and cost migrating Oracle databases to the current terminal version 19 release.
+Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minimal cost and delay.
 
-- enables minimal application downtime without licensing extra-cost options
+- uses functionality included with the basic software license
+- reduces application downtime to a minimum
 - tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - tested on target database versions 19.3 through 19.8 (CDB)
 
+Oracle's Multitenant architecture promotes improved use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. 
+
 # OVERVIEW
 
-Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (July 2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate to version 19:
+Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate:
 
-- starting with version 20 Oracle will only support Multitenant architecture (CDB)
-- you can now run 3 PDBs per CDB license-free starting version 19
 - version 19 has the longest support timeframe
 - pre version 19 databases are reaching end-of-life
-- adoption of Multitenant architecture significantly lowers the total cost of ownership
-- version 19 enables limited but cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
-- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux and Cloud continues to gather momentum
+- starting with version 20 Oracle only supports CDB as NON-CDB is deprecated
+- starting version 19 each CDB may comprise 3 PDBs at no additional cost
+- adoption of CDB (Multitenant architecture) can significantly lower the cost of ownership
+- version 19 enables limited cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
+- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux gathers further momentum
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
