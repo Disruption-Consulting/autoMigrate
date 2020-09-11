@@ -6,19 +6,21 @@ Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minima
 - tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - tested on target database versions 19.3 through 19.8 (CDB)
 
-Oracle's Multitenant architecture promotes improved use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. 
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. 
 
 # OVERVIEW
 
-Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate:
+Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
 
 - version 19 has the longest support timeframe
-- pre version 19 databases are reaching end-of-life
-- starting with version 20 Oracle only supports CDB as NON-CDB is deprecated
-- starting version 19 each CDB may comprise 3 PDBs at no additional cost
-- adoption of CDB (Multitenant architecture) can significantly lower the cost of ownership
-- version 19 enables limited cost-free use of features like in-Memory which can drastically reduce elapsed times of some queries
-- some variants of Unix (e.g. Solaris, HPUX) are exiting the market as adoption of Linux gathers further momentum
+- legacy databases are fast reaching end-of-life incurring extra support costs
+- NON-CDB is deprecated as of version 20
+- each version 19 CDB may comprise 3 PDBs at no additional cost
+- adoption of CDB can significantly lower the cost of ownership
+- version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
+
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs 735 PDBs consolidated within 5 CDBs. In addition, test and development databases usually spend most of their lives unused - with CDB these can now be consolidated into CDBs hosted on relatively cheap infrastructure, considerably reducing software licensing costs. Database provisioning that is enabled by PDB cloning is a 
+
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
