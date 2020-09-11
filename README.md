@@ -20,7 +20,7 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
 
-The "autoMigrate" utility was developed to provide a repeatable framework for securely coordinating the large number of tasks involved in database migration, including:
+The "autoMigrate" utility provides a framework for coordinating the large number of tasks involved in database migration, including:
 
 - transporting application data from source to target as an easily restartable process in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
@@ -32,34 +32,39 @@ The "autoMigrate" utility was developed to provide a repeatable framework for se
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-A key advantage offered by autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata; migrating a 10 TB database would take more than 4 days to migrate. 
-
+A key advantage of autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata.
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|5 mins||`sqlplus @tgt_migr`|
-|:no_entry:|10 hours||**...TRANFER DATA**|
-|:no_entry:|30 mins||**...TRANSFER METADATA**|
-|:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
+|:no_entry:|10 hours||**...TRANSFER DATA**|
+|:no_entry:|50 mins||**...RUN DATAPUMP**|
 |:no_entry:|TOTAL **11 hours**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-To mitigate such cases, the autoMigrate utility allows the Production application to remain fully available whilst it takes regular incremental data file backups in the background. It then transfers and applies these to the target database rolling it forward to near-synchronicity with the source database. In this way, the same 10 TB database would be mostly transferred before being set to read only for a final incremental backup.
+Migration involves first running the provided "src_migr" script on the NON-CDB source database; `mode=EXECUTE` sets all application tablespaces to read only which takes at most a few minutes depending on how many 'dirtied' blocks need to be written from the buffer cache. The provided "tgt_migr" script is then run on the target database which:
+1) creates a PDB to receive the NON-CDB
+2) transfers the read only data files from the NON-CDB to the PDB
+3) runs DATATPUMP to plug the data files into the PDB and copy source application objects like Users, PLSQL, Views, Sequences etc.
+
+The Production application is effectively unavailable until the migration completes. Depending on the business criticality of the application, 11 hours downtime, as in this example, may be acceptable. Many business-critical applications, however, may only support a much shorter period of downtime. For this reason, autoMigrate allows the Production application to remain fully available whilst it takes regular incremental data file backups which it applies to the target database rolling it forward to near-synchronicity with the source database.
+
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
 |:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
 |:white_check_mark:|5 mins||`sqlplus @tgt_migr`|
-|:white_check_mark:|10 hours||**...TRANFER DATA**|
+|:white_check_mark:|10 hours||**...TRANSFER DATA**|
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|5 mins||**...FINAL TRANFER DATA**|
-|:no_entry:|30 mins||**...TRANSFER METADATA**|
-|:no_entry:|20 mins||**...POST-MIGRATION TASKS**|
+|:no_entry:|5 mins||**...TRANSFER DATA FINAL**|
+|:no_entry:|50 mins||**...RUN DATAPUMP**|
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
+
+Migration by this method produces an identical end result. The **only** difference is the mechanism by which the data is transferred. For larger databases, data transfer time always constitutes the majority of the total migration elapsed time. In this example, the same 10 TB database is migrated with only 1 hour of unavailability. 
 
 autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace is a more complex process that requires 3 separate datapump runs. N.b. the 10.1.0.3 limitation applies only to cross-platform migrations; where source and targets are endianness compatible even version 8 can be migrated using TTS.
 
