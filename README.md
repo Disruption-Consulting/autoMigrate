@@ -1,7 +1,7 @@
 # automigrate
 Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minimal cost and delay.
 
-- uses functionality included with the basic software license
+- uses functionality exclusively included in the basic software license
 - reduces application downtime to a minimum
 - tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - tested on target database versions 19.3 through 19.8 (CDB)
@@ -19,7 +19,7 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 - adoption of CDB can significantly lower the cost of ownership
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs 735 PDBs consolidated within 5 CDBs. In addition, test and development databases usually spend most of their lives unused - with CDB these can now be consolidated into CDBs hosted on relatively cheap infrastructure, considerably reducing software licensing costs. Database provisioning that is enabled by PDB cloning is a 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs 735 PDBs consolidated within 5 CDBs. In addition, test and development databases which are mostly unused can now be consolidated into a single CDB and hosted on cheap infrastructure, considerably reducing software licensing costs. CDB also enables database self-provisioning, drastically reducing project timescales; likewise, creating database copies for tests is now a 5 minute PDB clone operation. Being able to backup and upgrade a single CDB infers saving the cost of duplicating these costly tasks for each of the contained PDBs.  The same Mobiliar company managed to upgrade all of its 735 PDBs from version 12.2 to 19 over a single weekend, an impossible undertaking for 735 NON-CDBs.
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
@@ -62,12 +62,11 @@ The Production application is effectively unavailable until the migration comple
 |:white_check_mark:||**START MIGRATION**||
 |:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`|`sqlplus @tgt_migr`|
 |:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
-|:white_check_mark:|.||**...ROLL FORWARD**|
 |:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
 |:white_check_mark:|.||**...ROLL FORWARD**|
 |:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
 |:white_check_mark:|.||**...ROLL FORWARD**|
-|:white_check_mark:|11 hours|||
+|:white_check_mark:|36 hours|||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|2 mins|**...FINAL BACKUP**||
 |:no_entry:|2 mins||**...FINAL TRANSFER BACKUP**|
@@ -76,7 +75,28 @@ The Production application is effectively unavailable until the migration comple
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-Migration by this method requires an additional intervention on the source database - `sqlplus @src_migr mode=INCR`. All remaining steps produce an identical end result. The **only** difference is the mechanism by which the data is transferred. For larger databases, data transfer time always constitutes the majority of the total migration elapsed time. In this example, the same 10 TB database is migrated with only 1 hour of unavailability. 
+Migration by this method requires one additional intervention on the source database - `sqlplus @src_migr mode=INCR`, which creates a background job running at user-defined intervals creating at first file image copies of each application tablespace data file. Once this is started, `sqlplus @tgt_migr` on the target automatically recognises that the source is creating backups and creates a background job runnning at the same frquency to transfer these to the destination PDB file system. Once file image backup copies have been taken, the source database job starts taking backups of any incremental changes since the last backup which are subsequently transferred and used by the target database job to roll forward its file image copies. 
+
+In this way, near-synchronous copies of all source application data files are maintained on the target database until the business decides to complete the migration by running `sqlplus @src_migr mode=EXECUTE`; from that point forward the migration proceeds in identical fashion since the only criterion for starting the DATAPUMP integration job is that all source database data files are read only. Here is the relevant PLSQL code:
+
+```
+        file_transfer;
+        
+        FOR C IN (SELECT COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0)) all_readonly FROM migration_ts@MIGR_DBLINK WHERE from_scn IS NOT NULL)
+        LOOP
+            apply_incremental;
+            IF (C.all_readonly>0) THEN
+                log('ROLLED FORWARD INCREMENTAL BACKUPS');
+                RETURN;
+            END IF;
+        END LOOP;
+        
+        datapump;
+```
+
+This managed process continues until all of the data 
+
+All remaining steps produce an identical end result. The **only** difference is the mechanism by which the data is transferred. For larger databases, data transfer time always constitutes the majority of the total migration elapsed time. In this example, the same 10 TB database is migrated with only 1 hour of unavailability. 
 
 autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace is a more complex process that requires 3 separate datapump runs. N.b. the 10.1.0.3 limitation applies only to cross-platform migrations; where source and targets are endianness compatible even version 8 can be migrated using TTS.
 
