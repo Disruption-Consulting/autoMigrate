@@ -64,11 +64,14 @@ The Production application is effectively unavailable until the migration comple
 |:white_check_mark:|.|**...BACKUP DATA**|`sqlplus @tgt_migr`|
 |:white_check_mark:|.||**...TRANSFER BACKUP**|
 |:white_check_mark:|.||**...ROLL FORWARD**|
-|:white_check_mark:|10 hours|"|"|
+|:white_check_mark:|.|**...BACKUP DATA**|`sqlplus @tgt_migr`|
+|:white_check_mark:|.||**...TRANSFER BACKUP**|
+|:white_check_mark:|.||**...ROLL FORWARD**|
+|:white_check_mark:|11 hours|-"-|-"-|
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|5 mins|**...FINAL BACKUP**||
-|:no_entry:|5 mins||**...FINAL TRANSFER BACKUP**|
-|:no_entry:|5 mins||**...FINAL ROLL FORWARD**|
+|:no_entry:|2 mins|**...FINAL BACKUP**||
+|:no_entry:|2 mins||**...FINAL TRANSFER BACKUP**|
+|:no_entry:|1 mins||**...FINAL ROLL FORWARD**|
 |:no_entry:|50 mins||**...RUN DATAPUMP**|
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
