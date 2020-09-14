@@ -61,17 +61,15 @@ The Production application is effectively unavailable until the migration comple
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
-|:white_check_mark:||***... BACKUP DATA LVL=0***|`sqlplus @tgt_migr`|
-|:white_check_mark:|5 mins|**...BACKUP DATA LVL=1**|**...CREATE PDB**|
-|:white_check_mark:|.|**...**|**...TRANSFER LVL=0 BACKUP**|
-|:white_check_mark:|.|**...**|**...TRANSFER LVL=1 BACKUP**|
-|:white_check_mark:|.||**...ROLL FORWARD**|
-|:white_check_mark:|36 hours|||
+|:white_check_mark:||`sqlplus @src_migr mode=INCR`||
+|:white_check_mark:||**...BACKUP DATA LVL=0***|`sqlplus @tgt_migr`|
+|:white_check_mark:||**...BACKUP DATA LVL=1**|**...CREATE PDB**|
+|:white_check_mark:|.|**...**|**...TRANSFER LVL=0**|
+|:white_check_mark:|.|**...**|**...TRANSFER LVL=1 & ROLL FORWARD**|
+|:white_check_mark:|TOTAL: **12 hours**|||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|2 mins|**...FINAL BACKUP**||
-|:no_entry:|2 mins||**...FINAL TRANSFER BACKUP**|
-|:no_entry:|1 mins||**...FINAL ROLL FORWARD**|
+|:no_entry:|2 mins|**...FINAL BACKUP LVL=1**||
+|:no_entry:|2 mins||**...FINAL TRANSFER LVL=1 & ROLL FORWARD**|
 |:no_entry:|50 mins||**...RUN DATAPUMP**|
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
