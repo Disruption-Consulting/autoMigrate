@@ -62,15 +62,16 @@ The Production application is effectively unavailable until the migration comple
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
 |:white_check_mark:||`sqlplus @src_migr mode=INCR`||
-|:white_check_mark:||**...BACKUP DATA LVL=0***|`sqlplus @tgt_migr`|
-|:white_check_mark:||**...BACKUP DATA LVL=1**|**...CREATE PDB**|
-|:white_check_mark:|.|**...**|**...TRANSFER LVL=0**|
-|:white_check_mark:|.|**...**|**...TRANSFER LVL=1 & ROLL FORWARD**|
+|:white_check_mark:||**BACKUP LVL=0**|`sqlplus @tgt_migr`|
+|:white_check_mark:||**BACKUP LVL=1**|**CREATE PDB**|
+|:white_check_mark:|.|:repeat:|**TRANSFER LVL=0**|
+|:white_check_mark:|.|:repeat:|**TRANSFER LVL=1 & ROLL FORWARD**|
+|:white_check_mark:|.|:repeat:|:repeat:|
 |:white_check_mark:|TOTAL: **12 hours**|||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|2 mins|**...FINAL BACKUP LVL=1**||
-|:no_entry:|2 mins||**...FINAL TRANSFER LVL=1 & ROLL FORWARD**|
-|:no_entry:|50 mins||**...RUN DATAPUMP**|
+|:no_entry:|2 mins|**FINAL BACKUP LVL=1**||
+|:no_entry:|2 mins||**FINAL TRANSFER LVL=1 & ROLL FORWARD**|
+|:no_entry:|50 mins||**RUN DATAPUMP**|
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
