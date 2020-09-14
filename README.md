@@ -45,9 +45,9 @@ A key advantage of autoMigrate is fully integrated functionality to migrate larg
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|||`sqlplus @tgt_migr`|
 |:no_entry:|5 mins||**CREATE PDB**|
-|:no_entry:|10 hours||**TRANSFER DATA**|
+|:no_entry:|11 hours||**TRANSFER DATA**|
 |:no_entry:|50 mins||**RUN DATAPUMP**|
-|:no_entry:|TOTAL **11 hours**|||
+|:no_entry:|TOTAL **12 hours**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
 Migration involves first running the provided "src_migr" script on the NON-CDB source database; `mode=EXECUTE` sets all application tablespaces to read only which takes at most a few minutes depending on how many 'dirtied' blocks need to be written from the buffer cache and how many application tablespaces are involved. The provided "tgt_migr" script is then run on the target database which:
@@ -55,7 +55,7 @@ Migration involves first running the provided "src_migr" script on the NON-CDB s
 2) transfers the read only data files from the NON-CDB to the PDB
 3) runs DATATPUMP to plug the data files into the PDB and integrate application objects like Users, PLSQL, Views, Sequences etc.
 
-The Production application is effectively unavailable until the migration completes. Depending on the business criticality of the application, 11 hours downtime, as in this example, may be acceptable. In many other cases, however, a much shorter period of downtime will be necessary. For this reason, autoMigrate allows the Production application to remain fully available whilst regular incremental data file backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database.
+The application is effectively unavailable until the migration completes. Depending on the business criticality of the application, 11 hours downtime, as in this example, may be acceptable. In many other cases, however, a much shorter period of downtime will be necessary. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental data file backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database.
 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
@@ -67,7 +67,7 @@ The Production application is effectively unavailable until the migration comple
 |:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=0**|
 |:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=1 & ROLL FORWARD**|
 |:white_check_mark:||:repeat:|:repeat:|
-|:white_check_mark:|TOTAL: **12 hours**|||
+|:white_check_mark:|TOTAL: **13 hours**|||
 |:no_entry:||`sqlplus @src_migr mode=EXECUTE`||
 |:no_entry:|5 mins|**BACKUP LVL=1**||
 |:no_entry:|5 mins||**TRANSFER LVL=1 & ROLL FORWARD**|
@@ -75,31 +75,14 @@ The Production application is effectively unavailable until the migration comple
 |:no_entry:|TOTAL: **1 hour**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-Migration by this method requires one additional intervention on the source database - `sqlplus @src_migr mode=INCR`, which creates a background job running at user-defined intervals creating at first file image copies of each application tablespace data file. Once this is started, `sqlplus @tgt_migr` on the target automatically recognises that the source is creating backups and creates a background job runnning at the same frquency to transfer these to the destination PDB file system. Once file image backup copies have been taken, the source database job starts taking backups of any incremental changes since the last backup which are subsequently transferred and used by the target database job to roll forward its file image copies. 
+Migration by this method requires starting with `sqlplus @src_migr mode=INCR`, which creates a background job running at user-defined intervals creating at first file image copies (Level=0 incremental backup) of each application tablespace data file. Once this is started, `sqlplus @tgt_migr` on the target automatically recognises that the source is creating backups and creates a background job runnning at the same frquency to transfer these to the destination PDB file system. Once file image backup copies have been taken, the source database job starts taking Level=1 incremental backups of any changes since the last backup which are subsequently transferred and used by the target database job to roll forward its file image copies. 
 
-In this way, near-synchronous copies of all source application data files are maintained on the target database until the business decides to complete the migration by running `sqlplus @src_migr mode=EXECUTE`; from that point forward the migration proceeds in identical fashion since the only criterion for starting the DATAPUMP integration job is that all source database data files are read only. Here is the relevant PLSQL code:
+In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `sqlplus @src_migr mode=EXECUTE`; from that point forward the migration proceeds in identical fashion since the only criterion for starting the DATAPUMP integration job is that all data files are read only. In this example, the same volume of data is migrated with 1 hour of application downtime compared to 12 hours. 
 
-```
-        file_transfer;
-        
-        FOR C IN (SELECT COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0)) all_readonly FROM migration_ts@MIGR_DBLINK WHERE from_scn IS NOT NULL)
-        LOOP
-            apply_incremental;
-            IF (C.all_readonly>0) THEN
-                log('ROLLED FORWARD INCREMENTAL BACKUPS');
-                RETURN;
-            END IF;
-        END LOOP;
-        
-        datapump;
-```
+autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both Data and Metadata in a single invocation of the datapump utility, whereas Transportable Tablespace (TTS)is a more complex process requiring 3 separate datapump runs - Users/Data/Metadata.
 
-This managed process continues until all of the data 
-
-All remaining steps produce an identical end result. The **only** difference is the mechanism by which the data is transferred. For larger databases, data transfer time always constitutes the majority of the total migration elapsed time. In this example, the same 10 TB database is migrated with only 1 hour of unavailability. 
-
-autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both DATA and METADATA in a single invocation of the datapump utility, whereas Transportable Tablespace is a more complex process that requires 3 separate datapump runs. N.b. the 10.1.0.3 limitation applies only to cross-platform migrations; where source and targets are endianness compatible even version 8 can be migrated using TTS.
-
+N.b. the 10.1.0.3 limitation applies only to cross-platform migrations. Where source and targets have the same endianness, even a version 8 database can be migrated using TTS.
+ 
 
 # AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
