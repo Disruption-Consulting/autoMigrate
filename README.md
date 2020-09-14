@@ -43,7 +43,8 @@ A key advantage of autoMigrate is fully integrated functionality to migrate larg
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|5 mins||`sqlplus @tgt_migr`|
+|:no_entry:|||`sqlplus @tgt_migr`|
+|:no_entry:|5 mins||**...CREATE PDB**|
 |:no_entry:|10 hours||**...TRANSFER DATA**|
 |:no_entry:|50 mins||**...RUN DATAPUMP**|
 |:no_entry:|TOTAL **11 hours**|||
@@ -60,11 +61,11 @@ The Production application is effectively unavailable until the migration comple
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`|`sqlplus @tgt_migr`|
-|:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
-|:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
-|:white_check_mark:|.||**...ROLL FORWARD**|
-|:white_check_mark:|.|**...BACKUP DATA**|**...TRANSFER BACKUP**|
+|:white_check_mark:|5 mins|`sqlplus @src_migr mode=INCR`||
+|:white_check_mark:||***... BACKUP DATA LVL=0***|`sqlplus @tgt_migr`|
+|:white_check_mark:|5 mins|**...BACKUP DATA LVL=1**|**...CREATE PDB**|
+|:white_check_mark:|.|**...**|**...TRANSFER LVL=0 BACKUP**|
+|:white_check_mark:|.|**...**|**...TRANSFER LVL=1 BACKUP**|
 |:white_check_mark:|.||**...ROLL FORWARD**|
 |:white_check_mark:|36 hours|||
 |:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
