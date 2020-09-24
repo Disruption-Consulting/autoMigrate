@@ -30,7 +30,6 @@ chkerr() {
 }
 
 runsql() {
-    
     local OPTIND
     local SQL
     local CONNECT="CONNECT / AS SYSDBA"
@@ -74,7 +73,7 @@ EOF
     chkerr "$?" "${LINENO}" "${VERSION}"
     
     local EXISTS=$(grep "^WALLET_LOCATION" "${SQLNET}"|wc -l)
-    if [ "${EXISTS}" = "0"]; then
+    if [ "${EXISTS}" = "0" ]; then
         cat <<-EOF>${SQLNET}
 WALLET_LOCATION =
    (SOURCE =
@@ -96,10 +95,20 @@ createCredential() {
     local PWD=${3}
     
     local WPW=$(runsql -v -s "SELECT log_message FROM ${USER}.migration_log WHERE name='WPW';")
+    chkerr "$?" "${LINENO}" "${VERSION}"
     
     mkstore -wrl "${WALLET}" -createCredential "${TNS}" "${USR}" "${PWD}"<<EOF
 ${WPW}
 EOF
+
+    local EXISTS=$(grep "^${TNS}" "${TNSNAMES}"|wc -l)
+    if [ "${EXISTS}" = "0" ]; then
+        local SERVICE=$(runsql -v -s "SELECT ${USER}.pck_migration_src.getdefaultservicename FROM dual;")
+        
+        cat <<-EOF>>${TNSNAMES}
+${TNS}=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=${SERVICE})))
+EOF
+    fi
 }
 
 removeSource() {
@@ -255,9 +264,25 @@ EOF
     createCredential "${USER}" "${USER}" "${PW}"
 }
 
+
 runSourceMigration() {
-   log "runSourceMigration"
-   # exec('exec '||:p_dblink_user||'.pck_migration_src.init_migration(p_ip_address=>:p_ip_address,p_run_mode=>:p_run_mode, p_incr_ts_dir=>:p_incr_ts_dir, p_incr_ts_freq=>:p_incr_ts_freq)');
+    log "runSourceMigration"
+    
+    local IP=$(hostname -I)
+    cat <<-EOF>${SQLFILE}
+    CONNECT /@${USER}
+    SET SERVEROUTPUT ON
+    SET LINESIZE 300
+    BEGIN
+        pck_migration_src.init_migration(
+            p_ip_address=>'${IP}',
+            p_run_mode=>'${MODE}', 
+            p_incr_ts_dir=>'${BKPDIR}', 
+            p_incr_ts_freq=>'${BKPFREQ}');
+    END;
+    /
+EOF
+    runsql
 }
 
 processSource() {

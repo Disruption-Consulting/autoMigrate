@@ -13,6 +13,9 @@ CREATE OR REPLACE PACKAGE pck_migration_src AS
     PROCEDURE incr_job(pAction in VARCHAR2, p_incr_ts_freq in VARCHAR2 DEFAULT NULL);
     --
     PROCEDURE uploadLog(pFilename IN VARCHAR2);
+    --
+    FUNCTION getDefaultServiceName RETURN VARCHAR2;
+    --
 END;
 /
 
@@ -22,7 +25,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
       pck_migration_src
 
     DESCRIPTION
-      This package is called from "src_migr.sql" to prepare the database for migration either directly or by a process of continuous recovery.
+      This package is called from "runMigration.sh" to prepare the database for migration either directly or by a process of continuous recovery.
 
       Full details available at https://github.com/xsf3190/automigrate.git
 */
@@ -141,7 +144,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         l_characterset varchar2(20);
         l_clob clob;
         l_db_name v$database.name%type;
-        l_hash_src_migr varchar2(40);
+        l_hash_runmigration varchar2(40);
         l_hash_pck_migration_src varchar2(40);
         l_host_name v$instance.host_name%type;
         l_log_mode v$database.log_mode%type;
@@ -168,8 +171,8 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         n PLS_INTEGER:=0;
     BEGIN
         dbms_lob.createtemporary(lob_loc => l_clob, cache => true, dur => dbms_lob.call);
-        fileToClob('src_migr.sql',l_clob);
-        l_hash_src_migr:=dbms_crypto.hash(l_clob,dbms_crypto.hash_sh1);
+        fileToClob('runMigration.sh',l_clob);
+        l_hash_runmigration:=dbms_crypto.hash(l_clob,dbms_crypto.hash_sh1);
         dbms_lob.freetemporary(lob_loc => l_clob);
 
         dbms_lob.createtemporary(lob_loc => l_clob, cache => true, dur => dbms_lob.call);
@@ -246,8 +249,8 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         log('             DATABASE MIGRATION','-');
         log('             RUN MODE : '||pRunMode);
         log('           ORACLE_SID : '||l_oracle_sid);
-        log('             SRC_MIGR : '||l_hash_src_migr||' (SHA-1)');
-        log('    PCK_MIGRATION_SRC : '||l_hash_pck_migration_src||' (SHA-1)');
+        log('      runMigration.sh : '||l_hash_runmigration||' (SHA-1)');
+        log('pck_migration_src.sql : '||l_hash_pck_migration_src||' (SHA-1)');
         log('       ORACLE_PDB_SID : '||NVL(l_oracle_pdb_sid,'N/A'));
         log('          ORACLE_HOME : '||l_oracle_home);
         log('            TNS_ADMIN : '||l_tns_admin);
@@ -278,7 +281,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         IF (n=0) THEN
             log('     DB LINK ANALYSIS : THERE ARE NO DB LINKS IN THIS DATABASE');
         ELSE
-            log('     DB LINK ANALYSIS : THERE ARE '||n||' DB LINKS IN THIS DATABASE');
+            log('     DB LINK ANALYSIS : THERE ARE '||n||' DB LINKS IN THIS DATABASE:');
         END IF;
 
         l_job_action:=q'{
@@ -599,7 +602,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
             l_command:=l_command||' USER='||l_whoami;
         END IF;
         */
-        l_command:='./runMigration -u ' || l_whoami||'/'''||l_password || ''' -t ' || p_ip_address || ':1521' || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
+        l_command:='./runMigration.sh -u ' || l_whoami||'/'''||l_password || ''' -t ' || TRIM(p_ip_address) || ':1521' || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
 
         log('ALL PREPARATION TASKS ON SOURCE DATABASE COMPLETED SUCCESSFULLY','-');
         log('');
