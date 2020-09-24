@@ -20,6 +20,11 @@ version() {
     echo "$((a * 10 ** 3 + b * 10 ** 2 + c * 10 + d))"
 }
 
+log() {
+    echo -e "${1//?/${2:-=}}\n$1\n${1//?/${2:-=}}";
+}
+
+
 chkerr() {
     [[ "$1" != 0 ]] && { echo -n "ERROR at line ${2}: "; echo "${3}"; exit 1; }
 }
@@ -52,10 +57,54 @@ runsql() {
     fi    
     
     sqlplus ${SILENT} /nolog @${SQLFILE} || { return 1; }
+}
 
+
+createWallet() {
+    log "createWallet - ${WALLET}"
+    
+    local WPW=$(password)
+    mkstore -wrl "${WALLET}" -create<<-EOF
+${WPW}
+${WPW}
+EOF
+    chkerr "$?" "${LINENO}" "${VERSION}"
+    
+    runsql -s "INSERT INTO ${USER}.migration_log(id, name, log_message) VALUES (${USER}.migration_log_seq.nextval,'WPW','${WPW}');"
+    chkerr "$?" "${LINENO}" "${VERSION}"
+    
+    local EXISTS=$(grep "^WALLET_LOCATION" "${SQLNET}"|wc -l)
+    if [ "${EXISTS}" = "0"]; then
+        cat <<-EOF>${SQLNET}
+WALLET_LOCATION =
+   (SOURCE =
+     (METHOD = FILE)
+     (METHOD_DATA =
+       (DIRECTORY = ${WALLET})
+     )
+   )
+SQLNET.WALLET_OVERRIDE = TRUE
+EOF
+    fi
+}
+
+createCredential() {
+    log "createCredential - ${1} ${2}"
+    
+    local TNS=${1}
+    local USR=${2}
+    local PWD=${3}
+    
+    local WPW=$(runsql -v -s "SELECT log_message FROM ${USER}.migration_log WHERE name='WPW';")
+    
+    mkstore -wrl "${WALLET}" -createCredential "${TNS}" "${USR}" "${PWD}"<<EOF
+${WPW}
+EOF
 }
 
 removeSource() {
+    log "removeSource"
+    
     cat <<-EOF>${SQLFILE}
         CONNECT / AS SYSDBA
         SET SERVEROUTPUT ON
@@ -90,9 +139,17 @@ EOF
         EXIT
 EOF
     rman cmdfile="${RMANFILE}" || { echo "RMAN DELETE BACKUPS FAILED"; exit 1; }
+    
+    if [ -d "${WALLET}" ]; then
+        log "mv ${WALLET} .. in preference to rm"
+        mv "${WALLET}" "${WALLET}_TOBEDELETED"
+    fi
 }
 
+
 createSourceSchema(){
+    log "createSourceSchema"
+    
     local PW=$(password)
     local V11=$(version "11")
     local V12=$(version "12")
@@ -145,11 +202,12 @@ createSourceSchema(){
 
         CREATE TABLE migration_log(
     			 id NUMBER,
+                 name VARCHAR2(10),
     			 log_time DATE DEFAULT SYSDATE,
     			 log_message CLOB,
     			 CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));
                  
-        INSERT INTO migration_log(id, log_message) VALUES (migration_log_seq.nextval,'${PW}');
+        INSERT INTO migration_log(id, name, log_message) VALUES (migration_log_seq.nextval,'PW','${PW}');
         COMMIT;
 EOF
 
@@ -191,10 +249,14 @@ EOF
 EOF
     
     runsql || { echo "createSourceSchema FAILED"; exit 1; }
+    
+    [[ ! -d "${WALLET}" ]] && createWallet
+    
+    createCredential "${USER}" "${USER}" "${PW}"
 }
 
 runSourceMigration() {
-   echo "runSourceMigration"
+   log "runSourceMigration"
    # exec('exec '||:p_dblink_user||'.pck_migration_src.init_migration(p_ip_address=>:p_ip_address,p_run_mode=>:p_run_mode, p_incr_ts_dir=>:p_incr_ts_dir, p_incr_ts_freq=>:p_incr_ts_freq)');
 }
 
@@ -229,14 +291,7 @@ processTarget() {
 }
 
 
-createWallet() {
-    mkstore -wrl "${WALLET}" -create<<-EOF
-${WPW}
-${WPW}
-EOF
-    chkerr "$?" "${LINENO}" "${VERSION}"
 
-}
 ##########################
 #   SCRIPT STARTS HERE   #
 ##########################
@@ -249,10 +304,14 @@ VTHIS=$(version "${VERSION}")
 [[ ${VERSION} = 19* ]] && DB=TARGET || DB=SOURCE
 
 export TNS_ADMIN="${CD}"
+WALLET="${TNS_ADMIN}/wallet"
+TNSNAMES="${TNS_ADMIN}/tnsnames.ora"
+SQLNET="${TNS_ADMIN}/sqlnet.ora"
 
-WALLET="${CD}/wallet"
+[[ ! -f "${TNSNAMES}" ]] && cat /dev/null>"${TNSNAMES}"
+[[ ! -f "${SQLNET}" ]] && cat /dev/null>"${SQLNET}"
 
-[[ ! -d "${WALLET}" ]] && { WPW=$(password); createWallet; }
+
 
 if [ "${DB}" = "SOURCE" ]; then
     MODE=ANALYZE
