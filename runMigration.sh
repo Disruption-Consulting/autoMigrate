@@ -4,6 +4,16 @@ SCRIPT=$(basename $0); FN="${SCRIPT%.*}"; LOGFILE=${FN}.log; SQLFILE=${FN}.sql; 
 
 exec > >(tee ${LOGFILE}) 2>&1
 
+usageSource() {
+    echo "Usage: $0 [ -m MODE ] [ - u USER ] [ -b BKPDIR ] [ -f BKPFREQ ]"
+    exit 1
+}
+
+usageTarget() {
+    echo "Usage: $0 [ -c CREDENTIAL ] [ - t TNS ] [ -p PDB ]"
+    exit 1
+}
+
 upper() {
     local UPPER=$(echo "${1}" | tr '[:lower:]' '[:upper:]')
     echo ${UPPER}
@@ -88,11 +98,14 @@ EOF
 }
 
 createCredential() {
-    log "createCredential - ${1} ${2}"
+    log "createCredential - ALIAS:${1} USER: ${2} SERVICE: ${4}"
     
-    local TNS=${1}
-    local USR=${2}
-    local PWD=${3}
+    [[ ! -d "${WALLET}" ]] && createWallet
+    
+    local TNS="${1}"
+    local USR="${2}"
+    local PWD="${3}"
+    local SVC="${4}"
     
     local WPW=$(runsql -v -s "SELECT log_message FROM ${USER}.migration_log WHERE name='WPW';")
     chkerr "$?" "${LINENO}" "${VERSION}"
@@ -103,10 +116,8 @@ EOF
 
     local EXISTS=$(grep "^${TNS}" "${TNSNAMES}"|wc -l)
     if [ "${EXISTS}" = "0" ]; then
-        local SERVICE=$(runsql -v -s "SELECT ${USER}.pck_migration_src.getdefaultservicename FROM dual;")
-        
         cat <<-EOF>>${TNSNAMES}
-${TNS}=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=${SERVICE})))
+${TNS}=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=${SVC})))
 EOF
     fi
 }
@@ -168,7 +179,7 @@ createSourceSchema(){
 
     cat <<-EOF>${SQLFILE}
         CONNECT / AS SYSDBA
-        CREATE USER MIGRATION IDENTIFIED BY ${PW} DEFAULT TABLESPACE SYSTEM QUOTA 10M ON SYSTEM;
+        CREATE USER ${USER} IDENTIFIED BY ${PW} DEFAULT TABLESPACE SYSTEM QUOTA 10M ON SYSTEM;
         GRANT SELECT ANY DICTIONARY,
               CREATE SESSION,
               ALTER TABLESPACE,
@@ -227,14 +238,18 @@ EOF
             CREATE OR REPLACE VIEW V_MIGRATION_USERS AS
               WITH u AS
               (
-                SELECT username,no_expdp,no_sby
+                SELECT username,no_expdp,no_sby,no_hc
                 FROM dba_users
                 LEFT OUTER JOIN (SELECT DISTINCT name username,'Y' no_expdp FROM sys.ku_noexp_tab WHERE obj_type='SCHEMA')
                  USING(username)
                 LEFT OUTER JOIN (SELECT DISTINCT name username,'Y' no_sby FROM system.logstdby\$skip_support WHERE action IN (0,-1))
                  USING(username)
+                LEFT OUTER JOIN (SELECT column_value as username, 'Y' no_hc FROM TABLE(sys.OdciVarchar2List(
+                'APEX_PUBLIC_USER', 'FLOWS_FILES', 'FLOWS_020100', 'FLOWS_030100','FLOWS_040100',
+                'OWBSYS_AUDIT', 'SPATIAL_CSW_ADMIN_USR', 'SPATIAL_WFS_ADMIN_USR','TSMSYS')))
+                 USING(username)
               )
-              SELECT username, DECODE(COALESCE(no_expdp,no_sby),NULL,'N','Y') oracle_maintained
+              SELECT username, DECODE(COALESCE(no_expdp,no_sby,no_hc),NULL,'N','Y') oracle_maintained
               FROM u
               WHERE username<>'${USER}';
 EOF
@@ -259,9 +274,9 @@ EOF
     
     runsql || { echo "createSourceSchema FAILED"; exit 1; }
     
-    [[ ! -d "${WALLET}" ]] && createWallet
+    local SERVICE=$(runsql -v -s "SELECT ${USER}.pck_migration_src.getdefaultservicename FROM dual;")
     
-    createCredential "${USER}" "${USER}" "${PW}"
+    createCredential "${USER}" "${USER}" "${PW}" "${SERVICE}" 
 }
 
 
@@ -282,16 +297,15 @@ runSourceMigration() {
     END;
     /
 EOF
-    runsql
+    runsql || { echo "runSourceMigration FAILED"; exit 1; }
 }
 
+
 processSource() {
-    
+    log "processSource"
     local MSG=
     [[ ! "${MODE}" =~ (^ANALYZE|EXECUTE|INCR$) ]] && MSG="-m <MODE> MUST BE ONE OF [ANALYZE|EXECUTE|INCR]. DEFAULT IS ANALYZE."
-    
     [[ "${MODE}" = "INCR"  &&  -z "${BKPDIR}" ]] && MSG="-b <BKPDIR> MUST BE SPECIFIED FOR -m INCR"
-    
     [[ "${MODE}" != "INCR"  &&  (-n "${BKPDIR}" || -n "${BKPFREQ}") ]] && MSG="-b <BKPDIR> AND -f <BKPFREQ> ONLY RELEVANT FOR -m INCR"
     
     if [ -n "${MSG}" ]; then
@@ -311,8 +325,180 @@ processSource() {
 }
 
 
+
+#################################
+#
+#    TARGET MIGRATION PROCESS
+#
+#################################
+
+createCommonUser() {
+    log "createCommonUser"
+    
+    local CPW=$(password)
+    
+    cat <<-EOF>${SQLFILE}
+    CONNECT / AS SYSDBA
+    CREATE USER ${USER} IDENTIFIED BY ${CPW} DEFAULT TABLESPACE SYSTEM QUOTA 1M ON SYSTEM;
+    GRANT ALTER SESSION,
+          ALTER USER,
+          CREATE DATABASE LINK,
+          CREATE PLUGGABLE DATABASE,
+          CREATE PROCEDURE,
+          CREATE SESSION,
+          CREATE SYNONYM,
+          CREATE TABLE,
+          SET CONTAINER TO ${USER};
+    GRANT SYSDBA TO ${USER} CONTAINER=ALL;
+    GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO ${USER};
+    GRANT SELECT ON SYS.CDB_DATA_FILES TO ${USER};
+    GRANT SELECT ON SYS.CDB_DIRECTORIES TO ${USER};
+    GRANT SELECT ON SYS.CDB_PDBS TO ${USER};
+    ALTER SESSION SET CURRENT_SCHEMA=${USER};
+    CREATE SEQUENCE migration_log_seq START WITH 1 INCREMENT BY 1;
+    CREATE TABLE migration_log(
+             id NUMBER,
+             name VARCHAR2(10),
+             log_time DATE DEFAULT SYSDATE,
+             log_message CLOB,
+             CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));    
+EOF
+    runsql || { echo "createCommonUser FAILED"; exit 1; }
+    
+    createCredential "${USER}" "${USER}" "${CPW}" "${ORACLE_SID}" 
+}
+
+removeTarget() {
+    log "removeTarget"
+}
+
+
+createTargetSchema() {
+    log "createTargetSchema"
+    
+    local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM dba_users WHERE username='${USER}');")
+    chkerr "$?" "${LINENO}" "${EXISTS}"
+    
+    [[ "${EXISTS}" = "0" ]] && createCommonUser
+    
+    local PW=$(password)
+    
+    DBLINKUSR=${CRED%%/*}
+    DBLINKPWD=${CRED#*/}
+    
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${USER} AS SYSDBA
+        CREATE PLUGGABLE DATABASE ${PDB} ADMIN USER PDBADMIN IDENTIFIED BY ${PW} ROLES=(DATAPUMP_IMP_FULL_DATABASE) FILE_NAME_CONVERT=('pdbseed','${PDB}');
+        ALTER USER ${USER} SET CONTAINER_DATA = (CDB\$ROOT, ${PDB}) CONTAINER=CURRENT;
+        ALTER SESSION SET CONTAINER=${PDB};
+        ALTER PLUGGABLE DATABASE ${PDB} OPEN READ WRITE;
+        ALTER PLUGGABLE DATABASE ${PDB} SAVE STATE;
+        AUDIT CONNECT;
+        ALTER USER PDBADMIN QUOTA UNLIMITED ON SYSTEM;
+        GRANT ALTER SESSION TO PDBADMIN;
+        GRANT ALTER TABLESPACE TO PDBADMIN;
+        GRANT ANALYZE ANY TO PDBADMIN;
+        GRANT ANALYZE ANY DICTIONARY TO PDBADMIN;
+        GRANT CREATE ANY DIRECTORY TO PDBADMIN;
+        GRANT CREATE JOB TO PDBADMIN;
+        GRANT CREATE MATERIALIZED VIEW TO PDBADMIN;
+        GRANT CREATE PROCEDURE TO PDBADMIN;
+        GRANT CREATE PUBLIC DATABASE LINK TO PDBADMIN;
+        GRANT CREATE SESSION TO PDBADMIN;
+        GRANT CREATE TABLE TO PDBADMIN;
+        GRANT CREATE TABLESPACE TO PDBADMIN;
+        GRANT DROP ANY DIRECTORY TO PDBADMIN;
+        GRANT DROP TABLESPACE TO PDBADMIN;
+        GRANT MANAGE SCHEDULER TO PDBADMIN;
+        GRANT SELECT ANY DICTIONARY TO PDBADMIN;
+        GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO PDBADMIN;
+        GRANT EXECUTE ON SYS.DBMS_FILE_TRANSFER TO PDBADMIN;
+        GRANT EXECUTE ON SYS.DBMS_SYSTEM TO PDBADMIN;
+        GRANT EXECUTE ON SYS.DBMS_CRYPTO TO PDBADMIN;
+        CREATE DIRECTORY MIGRATION_SCRIPT_DIR AS '${CD}';
+        GRANT READ, WRITE ON DIRECTORY MIGRATION_SCRIPT_DIR TO PDBADMIN;
+        COL con_id NEW_VALUE con_id noprint;
+        COL filepath NEW_VALUE filepath noprint;
+        SELECT SYS_CONTEXT('USERENV','CON_ID') AS con_id FROM dual;
+        SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1))) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
+        CREATE OR REPLACE DIRECTORY TGT_FILES_DIR AS '&filepath';
+        GRANT READ, WRITE ON DIRECTORY TGT_FILES_DIR TO PDBADMIN;
+        CREATE TABLE PDBADMIN.migration_ts
+                       ("TABLESPACE_NAME"   VARCHAR2(30),
+                        "ENABLED"           VARCHAR2(20),
+                        "PLATFORM_ID"       NUMBER,
+                        "FILE_ID"           NUMBER,
+                        "FILE_NAME"         VARCHAR2(100),
+                        "DIRECTORY_NAME"    VARCHAR2(30),
+                        "FILE_NAME_RENAMED" VARCHAR2(107),
+                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
+                        "START_TIME"        DATE,
+                        "ELAPSED_SECONDS"   NUMBER,
+                        "BYTES"             NUMBER,
+                        "TRANSFERRED_BYTES" NUMBER,
+                       CONSTRAINT PK_MIGRATION_TS PRIMARY KEY(FILE_ID));
+        CREATE TABLE PDBADMIN.migration_bp
+                       ("RECID"             NUMBER,
+                        "FILE_ID"           NUMBER,
+                        "BP_FILE_NAME"      VARCHAR2(100),
+                        "DIRECTORY_NAME"    VARCHAR2(30),
+                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
+                        "START_TIME"        DATE,
+                        "ELAPSED_SECONDS"   NUMBER,
+                        "BYTES"             NUMBER,
+                        "TRANSFERRED_BYTES" NUMBER,
+                        CONSTRAINT pk_migration_bp PRIMARY KEY(recid),
+                        CONSTRAINT fk_migration_ts FOREIGN KEY(file_id) REFERENCES PDBADMIN.migration_ts(file_id));
+        CREATE SEQUENCE PDBADMIN.migration_log_seq START WITH 1 INCREMENT BY 1;
+        CREATE TABLE PDBADMIN.migration_log
+                       ("ID"            NUMBER DEFAULT PDBADMIN.migration_log_seq.NEXTVAL,
+                        "LOG_TIME"      DATE DEFAULT SYSDATE,
+                        "LOG_MESSAGE"   CLOB,
+                        CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));
+        CREATE PUBLIC DATABASE LINK MIGR_DBLINK CONNECT TO ${DBLINKUSR} IDENTIFIED BY ${DBLINKPWD} USING '${TNS}';
+        PROMPT "Compiling pck_migration_tgt.sql";
+        set echo off;
+        @@pck_migration_tgt.sql;
+        set echo on;
+        show errors;
+        BEGIN
+            execute immediate 'alter package body pdbadmin.pck_migration_tgt compile'; 
+            exception when others then raise_application_error(-20000,'compilation error');
+        END;
+        /
+EOF
+    runsql || { echo "createTargetSchema FAILED"; exit 1; }
+    
+    createCredential "${PDB}" "PDBADMIN" "${PW}" "${PDB}" 
+}
+
+
+runTargetMigration() {
+    log "runTargetMigration"
+}
+
+
 processTarget() {
-    echo "processTarget"
+    log "processTarget"
+    local MSG=
+    [[ -z "${CRED}" ]] && MSG="-u <CRED> USER CREDENTIALS OF SOURCE MIGRATION SCHEMA MANDATORY."
+    [[ -z "${TNS}" ]] && MSG="-t <TNS> TNS DETAILS OF SOURCE MIGRATION DATABASE MANDATORY."
+    [[ -z "${PDB}" ]] && MSG="-p <PDB> NAME OF TARGET PDB IS MANDATORY."
+    
+    if [ -n "${MSG}" ]; then
+        echo "${MSG}"
+        exit 1
+    fi
+    
+    if [ "${REMOVE}" = "TRUE" ]; then
+        removeTarget
+        exit 0
+    fi
+    
+    local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM cdb_pdbs WHERE pdb_name='${PDB}');")
+    chkerr "$?" "${LINENO}" "${EXISTS}"
+    
+    [[ "${EXISTS}" = "0" ]] && createTargetSchema || runTargetMigration    
 }
 
 
@@ -338,20 +524,45 @@ SQLNET="${TNS_ADMIN}/sqlnet.ora"
 
 
 
-if [ "${DB}" = "SOURCE" ]; then
-    MODE=ANALYZE
-    USER=MIGRATION
-    REMOVE=FALSE
-    while getopts "m:u:b:f:r" o; do
-        case "${o}" in
-            m) MODE=$(upper ${OPTARG}) ;;
-            u) USER=${OPTARG} ;;
-            b) BKPDIR=${OPTARG} ;;
-            f) BKPFREQ=${OPTARG} ;;
-            r) REMOVE=TRUE ;;
-        esac
-    done
-    processSource
-fi
+case "${DB}" in
+    SOURCE)
+        MODE=ANALYZE
+        USER=MIGRATION
+        REMOVE=FALSE
+        while getopts "m:u:b:f:r" o; do
+            case "${o}" in
+                m) MODE=$(upper ${OPTARG}) ;;
+                u) USER=${OPTARG} ;;
+                b) BKPDIR=${OPTARG} ;;
+                f) BKPFREQ=${OPTARG} ;;
+                r) REMOVE=TRUE ;;
+                h)  usageSource ;;
+                :)  echo "ERROR -${OPTARG} REQUIRES  ARGUMENT"
+                    usageSource
+                    ;;
+                *)  usageSource ;;
+            esac
+        done
+        processSource
+        ;;
+    TARGET)
+        USER=C##MIGRATION
+        REMOVE=FALSE
+        while getopts ":c:t:p:rh" o; do
+            case "${o}" in
+                c)  CRED=${OPTARG} ;;
+                t)  TNS=${OPTARG} ;;
+                p)  PDB=$(upper ${OPTARG}) ;;
+                r)  REMOVE=TRUE ;;
+                h)  usageTarget ;;
+                :)  echo "ERROR -${OPTARG} REQUIRES  ARGUMENT"
+                    usageTarget
+                    ;;
+                *)  usageTarget ;;
+            esac
+        done    
+        processTarget
+        ;;
+esac
 
 exit
