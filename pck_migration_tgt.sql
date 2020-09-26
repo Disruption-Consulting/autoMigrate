@@ -2,7 +2,7 @@ create or replace PACKAGE PDBADMIN.pck_migration_tgt AS
     --
     PROCEDURE transfer;
     --
-    PROCEDURE impdp(pOverride IN BOOLEAN);
+    PROCEDURE impdp(pOverride IN BOOLEAN DEFAULT FALSE);
     --
     PROCEDURE final;
     --
@@ -950,13 +950,8 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         MERGE INTO migration_ts t
         USING
          (        
-             SELECT t.tablespace_name, t.status, f.file_id, SUBSTR(f.file_name,INSTR(f.file_name,'/',-1)+1) file_name, d.directory_name, f.bytes
-               FROM dba_data_files@MIGR_DBLINK f, dba_tablespaces@MIGR_DBLINK t, dba_directories@MIGR_DBLINK d
-              WHERE t.contents='PERMANENT'
-                AND t.tablespace_name NOT IN ('SYSTEM','SYSAUX')
-                AND t.tablespace_name=f.tablespace_name
-                AND d.directory_path=SUBSTR(f.file_name,1,INSTR(f.file_name,'/',-1)-1)
-                AND d.directory_name<>'TGT_FILES_DIR'
+             SELECT tablespace_name, status, file_id, file_name, directory_name, bytes
+               FROM v_app_tablespaces@MIGR_DBLINK
               UNION ALL
              SELECT t.name as tablespace_name, f.enabled, c.file# as file_id, SUBSTR(c.name,INSTR(c.name,'/',-1)+1) as file_name, dir.directory_name, f.bytes
                FROM v$datafile_copy@MIGR_DBLINK c, v$datafile@MIGR_DBLINK f, v$tablespace@MIGR_DBLINK t, dba_directories@MIGR_DBLINK dir

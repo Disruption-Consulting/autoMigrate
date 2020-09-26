@@ -20,7 +20,7 @@ upper() {
 }
 
 password() {
-    local PW=$(cat /dev/urandom | tr -cd "a-zA-Z0-9@#%^*()_+?><~\`;'" | head -c 10)
+    local PW=$(cat /dev/urandom | tr -cd "a-zA-Z0-9@#%^*()_+?><~\`;" | head -c 10)
     echo \"${PW}\"
 }
 
@@ -194,16 +194,18 @@ createSourceSchema(){
         
         ALTER SESSION SET CURRENT_SCHEMA=${USER};
         CREATE OR REPLACE VIEW V_APP_TABLESPACES AS
-          SELECT tablespace_name, status, file_id, SUBSTR(file_name,1,pos-1) directory_name, SUBSTR(file_name,pos+1) file_name, enabled, bytes
+          SELECT t.tablespace_name, t.status, t.file_id, d.directory_path, d.directory_name, SUBSTR(t.file_name,pos+1) file_name, t.enabled, t.bytes
           FROM
             (
              SELECT t.tablespace_name, t.status, f.file_id, f.file_name,INSTR(f.file_name,'/',-1) pos, f.bytes, v.enabled
-               FROM dba_tablespaces t, dba_data_files f, v\$datafile v
+               FROM dba_tablespaces t, dba_data_files f, v$datafile v
               WHERE t.tablespace_name=f.tablespace_name
                 AND v.file#=f.file_id
                 AND t.contents='PERMANENT'
                 AND t.tablespace_name NOT IN ('SYSTEM','SYSAUX')
-            );
+            ) t, all_directories d
+            WHERE SUBSTR(t.file_name,1,pos-1)=d.directory_path
+            AND d.directory_name LIKE 'MIGRATION_FILES%';
             
         CREATE TABLE migration_ts(
                     file# NUMBER,
@@ -365,7 +367,7 @@ createCommonUser() {
 EOF
     runsql || { echo "createCommonUser FAILED"; exit 1; }
     
-    createCredential "${USER}" "${USER}" "${CPW}" "${ORACLE_SID}" 
+    createCredential "${ORACLE_SID}" "${USER}" "${CPW}" "${ORACLE_SID}" 
 }
 
 removeTarget() {
@@ -462,10 +464,29 @@ createTargetSchema() {
         set echo on;
         show errors;
         BEGIN
-            execute immediate 'alter package body pdbadmin.pck_migration_tgt compile'; 
+            execute immediate 'alter package pdbadmin.pck_migration_tgt compile'; 
             exception when others then raise_application_error(-20000,'compilation error');
         END;
         /
+        GRANT SELECT, UPDATE ON PDBADMIN.MIGRATION_TS TO ${USER} CONTAINER=CURRENT;
+        GRANT SELECT, UPDATE ON PDBADMIN.MIGRATION_BP TO ${USER} CONTAINER=CURRENT;
+        GRANT SELECT ON PDBADMIN.migration_log_seq TO ${USER} CONTAINER=CURRENT;
+        GRANT SELECT, INSERT ON PDBADMIN.MIGRATION_LOG TO ${USER} CONTAINER=CURRENT;
+        CONNECT /@${USER}
+        WHENEVER SQLERROR CONTINUE
+        DROP DATABASE LINK PDB_DBLINK;
+        WHENEVER SQLERROR EXIT FAILURE
+        CREATE DATABASE LINK PDB_DBLINK CONNECT TO PDBADMIN IDENTIFIED BY ${PW} USING '//localhost/${PDB}';
+        PROMPT "Compiling pck_migration_rollforward.sql";
+        set echo off;
+        @@pck_migration_rollforward.sql;
+        set echo on;
+        show errors;
+        BEGIN
+            execute immediate 'alter package pck_migration_rollforward compile'; 
+            exception when others then raise_application_error(-20000,'compilation error');
+        END;
+        /        
 EOF
     runsql || { echo "createTargetSchema FAILED"; exit 1; }
     
@@ -475,11 +496,37 @@ EOF
 
 runTargetMigration() {
     log "runTargetMigration"
+    
+    local RUNSCRIPT="${FN}.${PDB}"
+    
+    cat <<-EOF>${RUNSCRIPT}.sql
+        whenever sqlerror exit failure
+        connect /@${PDB}
+        exec pck_migration_tgt.transfer
+        exit
+EOF
+
+    cat /dev/null>${RUNSCRIPT}.impdp.sh
+    cat /dev/null>${RUNSCRIPT}.final.sh
+    
+    cat <<-EOF>${RUNSCRIPT}.sh
+#!/bin/bash
+exec 1>${RUNSCRIPT}.log 2>&1
+export ORACLE_HOME=${ORACLE_HOME}
+export ORACLE_SID=${ORACLE_SID}
+export PATH=\${ORACLE_HOME}/bin:${PATH}
+export TNS_ADMIN=${CD}
+sqlplus /nolog @${RUNSCRIPT}.sql
+. /opt/oracle/oradata/migration_impdp.sh
+. /opt/oracle/oradata/migration_final.sh
+exit 0
+EOF
 }
 
 
 processTarget() {
     log "processTarget"
+    
     local MSG=
     [[ -z "${CRED}" ]] && MSG="-u <CRED> USER CREDENTIALS OF SOURCE MIGRATION SCHEMA MANDATORY."
     [[ -z "${TNS}" ]] && MSG="-t <TNS> TNS DETAILS OF SOURCE MIGRATION DATABASE MANDATORY."
