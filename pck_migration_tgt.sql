@@ -2,9 +2,11 @@ create or replace PACKAGE PDBADMIN.pck_migration_tgt AS
     --
     PROCEDURE transfer;
     --
-    PROCEDURE impdp;
+    PROCEDURE impdp(pOverride IN BOOLEAN);
     --
     PROCEDURE final;
+    --
+    PROCEDURE preCreateUserTS(pAction IN VARCHAR2);
     --
     PROCEDURE uploadLog(pFilename IN VARCHAR2);
     --
@@ -17,7 +19,6 @@ END;
 create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
 
     PDBNAME        VARCHAR2(50):=SYS_CONTEXT('USERENV','CON_NAME');
-    PARFILE        VARCHAR2(50):=PDBNAME||'.impdp.parfile';
     TRANSFER_USER  VARCHAR2(30);
     DATAFILE_PATH  all_directories.directory_path%type;
     TEMPFILE_PATH  all_directories.directory_path%type;
@@ -167,56 +168,60 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     
     --
     -- PROCEDURE preCreateUserTS
-    --   Tablespace DATAPUMP export/import requires all user-defined Tablespaces to be pre-created 
+    --   For XTTS-TS all user Default Tablespaces are pre-created before step 1 imports users
     --
     -------------------------------
-    PROCEDURE preCreateUserTS IS
+    PROCEDURE preCreateUserTS(pAction IN VARCHAR2) IS
         l_ddl VARCHAR2(500);
-        
     BEGIN                                                
         FOR C IN (SELECT DISTINCT default_tablespace 
                     FROM dba_users@migr_dblink
                    WHERE default_tablespace IN (SELECT tablespace_name FROM V_app_tablespaces@migr_dblink)) LOOP
-            l_ddl:='CREATE TABLESPACE '||C.default_tablespace||' DATAFILE '''||DATAFILE_PATH||'/'||LOWER(C.default_tablespace||'.dbf'' SIZE 1M');
+            IF (pAction='CREATE') THEN
+                l_ddl:='CREATE TABLESPACE '||C.default_tablespace||' DATAFILE '''||DATAFILE_PATH||'/'||LOWER(C.default_tablespace||'.dbf'' SIZE 1M');
+            ELSE
+                l_ddl:='DROP TABLESPACE '||C.default_tablespace||' INCLUDING CONTENTS AND DATAFILES';
+            END IF;
             executeDDL(l_ddl);
         END LOOP;
     END;  
     
     --
     --  PROCEDURE create_impdp_parfile
-    --    Creates parfile(s) for impdp according to the type of migration
+    --    Creates parfile(s) for impdp according to the type of migration (1 parfile for XTTS-DB, 3 parfiles for XTTS-TS)
     --  
     -------------------------------
-    FUNCTION create_impdp_parfile(pMigration IN VARCHAR2, pCompatibility IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+    PROCEDURE create_impdp_parfile(pMigration IN VARCHAR2, pCompatibility IN VARCHAR2, pParfiles IN OUT SYS.ODCIVARCHAR2LIST) IS
         f utl_file.file_type;
-        l_parfiles VARCHAR2(1000):=NULL;
+        log VARCHAR2(100);
         
-        PROCEDURE openParfile(pDescription IN VARCHAR2, pSuffix IN VARCHAR2 DEFAULT NULL) IS
-            l_filename VARCHAR2(100):=PARFILE||pSuffix;
+        FUNCTION openParfile(pDescription IN VARCHAR2, pSuffix IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+            l_filename VARCHAR2(100):='migration.'||PDBNAME||pSuffix||'.parfile';
         BEGIN
-            f:=utl_file.fopen(location=>'TMPDIR', filename=>l_filename, open_mode=>'w', max_linesize=>32767);
-            l_parfiles:=l_parfiles||l_filename||',';
+            f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>l_filename, open_mode=>'w', max_linesize=>32767);
             utl_file.put_line(f,RPAD('#',LENGTH(pDescription)+15,'#'));
             utl_file.put_line(f,'#');
             utl_file.put_line(f,'#    DESCRIPTION');
             utl_file.put_line(f,'#      '||pDescription);
             utl_file.put_line(f,'#');
             utl_file.put_line(f,RPAD('#',LENGTH(pDescription)+15,'#'));
+            pParfiles.EXTEND;
+            pParfiles(pParfiles.COUNT):=l_filename;
+            RETURN l_filename||'.log';
         END;
         
     BEGIN
         CASE
-                
             WHEN (pMigration='XTTS_DB') THEN
-                openParfile('Parfile performs a Full Transportable Database import/export');
+                log:=openParfile('Import FULL TRANSPORTABLE DATABASE');
 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
-                utl_file.put_line(f,'LOGFILE=TMPDIR:'||PDBNAME||'.impdp.log');
+                utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
                 utl_file.put_line(f,'LOGTIME=ALL');
                 utl_file.put_line(f,'EXCLUDE=TABLE_STATISTICS,INDEX_STATISTICS');
                 utl_file.put_line(f,'EXCLUDE=TABLESPACE:"IN (''UNDOTBS1'', ''TEMP'')"');
                 utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE''MIGRATION_FILES_%''"');
-                utl_file.put_line(f,q'{EXCLUDE=SCHEMA:"IN ('}'||TRANSFER_USER||q'{')"}');
+                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'')"');
                 utl_file.put_line(f,'METRICS=Y');
                 utl_file.put_line(f,'FULL=Y');
                 utl_file.put_line(f,'TRANSPORTABLE=ALWAYS');
@@ -237,17 +242,15 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 utl_file.fclose(f);
                           
             WHEN (pMigration='XTTS_TS') THEN
-                /*
-                 *   MOS Doc ID 733824.1 How to recreate a database using TTS
-                 */
                 --
                 -- 1. Users/Roles/Profiles/Role grants export / import
                 --
-                preCreateUserTS;
-                openParfile('Parfile performs a full metadata only import/export','1');             
+                preCreateUserTS('CREATE');
+                                
+                log:=openParfile('Import USER,ROLE,ROLE_GRANT,PROFILE','.1');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
-                utl_file.put_line(f,'LOGFILE=TMPDIR:'||PDBNAME||'.impdp.log');
+                utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
                 utl_file.put_line(f,'LOGTIME=ALL');    
                 utl_file.put_line(f,'INCLUDE=USER,ROLE,ROLE_GRANT,PROFILE');
                 utl_file.put_line(f,'METRICS=Y');
@@ -258,10 +261,10 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 --
                 -- 2. TTS export / import
                 --
-                openParfile('Parfile performs a Transportable Tablespace import/export','2');             
+                log:=openParfile('Import TABLESPACES','2');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
-                utl_file.put_line(f,'LOGFILE=TMPDIR:'||PDBNAME||'.impdp.log.2');
+                utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
                 utl_file.put_line(f,'LOGTIME=ALL');    
                 utl_file.put_line(f,'EXCLUDE=TABLE_STATISTICS,INDEX_STATISTICS');
                 utl_file.put_line(f,'METRICS=Y');
@@ -280,14 +283,14 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 --
                 -- 3. Full metadata only export / import
                 --
-                openParfile('Parfile performs a full metadata only import/export','3');             
+                log:=openParfile('Import remaining METADATA','3');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
-                utl_file.put_line(f,'LOGFILE=TMPDIR:'||PDBNAME||'.impdp.log.3');
+                utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
                 utl_file.put_line(f,'LOGTIME=ALL');    
                 utl_file.put_line(f,'EXCLUDE=USER,ROLE,ROLE_GRANT,PROFILE,TABLE_STATISTICS,INDEX_STATISTICS');
                 utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE''MIGRATION_FILES_%''"');
-                utl_file.put_line(f,q'{EXCLUDE=SCHEMA:"IN ('}'||TRANSFER_USER||q'{')"}');
+                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'')"');
                 utl_file.put_line(f,'METRICS=Y');
                 utl_file.put_line(f,'FULL=Y');
                 utl_file.put_line(f,'CONTENT=METADATA_ONLY');
@@ -296,60 +299,19 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 utl_file.fclose(f);
         END CASE;
         
-        RETURN(RTRIM(l_parfiles,','));
-        
         EXCEPTION 
             WHEN OTHERS THEN 
                 utl_file.fclose(f); 
                 RAISE;
     END;
+
     
     --
-    -- PROCEDURE checkCharsets
-    --   Check that source and target database character sets match
-    --  
-    -------------------------------
-    PROCEDURE checkCharsets IS
-        l_mismatch VARCHAR2(200):=NULL;
-        l_error VARCHAR2(500);
-        l_convDB BOOLEAN;
-    BEGIN
-        FOR C IN (
-            SELECT COUNT(src) src, COUNT(tgt) tgt, property_name, property_value
-            FROM
-            (
-            SELECT 1 tgt, TO_NUMBER(NULL) src, property_name, property_value 
-            FROM database_properties WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
-            UNION ALL
-            SELECT TO_NUMBER(NULL) tgt, 1 src, property_name, property_value 
-            FROM database_properties@MIGR_DBLINK WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
-            )
-            GROUP BY property_name, property_value
-            ) 
-        LOOP
-            IF (C.tgt=1 AND C.src=1) THEN
-                CONTINUE;
-            END IF;
-            IF (C.src=1) THEN
-                l_mismatch:=l_mismatch||' SOURCE '||C.property_name||':'||C.property_value;
-            ELSE
-                l_mismatch:=l_mismatch||' TARGET '||C.property_name||':'||C.property_value;
-            END IF;
-        END LOOP;
-        
-        IF (l_mismatch IS NOT NULL) THEN
-            l_error:='CHARACTER SET MISMATCH'||l_mismatch;
-            log(l_error);
-            RAISE_APPLICATION_ERROR(-20000,l_error);
-        END IF;
-    END;
-    
-    --
-    -- PROCEDURE create_parfile
-    --   Run impdp over network link
+    -- PROCEDURE impdp
+    --   Create datapump parfiles to be referenced in external job that performs the migration
     --    
-    -------------------------------
-    FUNCTION create_parfile(pOverride IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
+    -------------------------------    
+    PROCEDURE impdp(pOverride IN BOOLEAN) IS
         l_src_version_s VARCHAR2(20);
         l_src_compat_s VARCHAR2(20);
         l_tgt_version_s VARCHAR2(20);
@@ -358,66 +320,9 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         l_tgt_version NUMBER;        
         l_migration_method VARCHAR2(7);
         l_compatible VARCHAR2(10);
-        l_parfiles VARCHAR2(1000);
-    BEGIN
-        IF (pOverride='CONV-DB') THEN
-            l_migration_method:='CONV_DB';
-            l_compatible:='LATEST';
-        ELSE
-           /*
-            *  DETERMINE OPTIMAL MIGRATION METHOD
-            *
-            *    SOURCE DB >= 11.2.0.3    => TRANSPORTABLE DATABASE
-            *    SOURCE DB <  11.2.0.3    => TRANSPORTABLE TABLESPACE (COMPATIBILITY MUST BE > 10.0 FOR CROSS-PLATFORM MIGRATION)
-            */        
-            SELECT MAX(DECODE(what,'src',version)) src_version, MAX(DECODE(what,'src_compat',version)) src_compat, MAX(DECODE(what,'tgt',version)) tgt_version
-            INTO l_src_version_s, l_src_compat_s, l_tgt_version_s
-            FROM
-            (
-            SELECT 'tgt' what, version FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM=1
-            UNION ALL
-            SELECT 'src' what, version FROM product_component_version@MIGR_DBLINK WHERE product LIKE 'Oracle%'  AND ROWNUM=1
-            UNION ALL
-            SELECT 'src_compat' what, value FROM database_compatible_level@MIGR_DBLINK 
-            );  
-
-            l_src_version:=version(l_src_version_s);
-            l_src_compat:=version(l_src_compat_s);
-            l_tgt_version:=version(l_tgt_version_s);
-
-            IF (l_src_version >= version('12')) THEN
-                l_migration_method:='XTTS_DB';
-                l_compatible:='LATEST';
-            ELSIF (l_src_version >= version('11.2.0.3')) THEN
-                l_migration_method:='XTTS_DB';
-                l_compatible:='12';
-            ELSIF (l_src_version >= version('10.1.0.3') AND l_src_compat >= version('10.0')) THEN
-                l_migration_method:='XTTS_TS';
-                l_compatible:='LATEST';
-            END IF;
-        END IF;
-        
-        /*
-         *  ONLY PROVIDE THIS OVERRIDE FOR ME TO TEST MIGRATION FROM V10 WHICH I DON'T HAVE
-         */ 
-        IF (pOverride='XTTS-TS') THEN
-            l_migration_method:='XTTS_TS';
-        END IF;
-
-        /*
-         *  CREATE PARFILE(S)
-         */
-        l_parfiles:=create_impdp_parfile(l_migration_method, l_compatible);
-        
-        RETURN (l_parfiles);
-    END;
-    
-    --
-    -- PROCEDURE impdp
-    --   Create datapump parfiles to be referenced in external job that performs the migration
-    --    
-    -------------------------------    
-    PROCEDURE impdp IS
+        l_parfiles SYS.ODCIVARCHAR2LIST:=SYS.ODCIVARCHAR2LIST();
+        f utl_file.file_type;
+        ----------------------
         PROCEDURE print_sqlcmd(pCmd IN VARCHAR2,pBlock IN BOOLEAN DEFAULT FALSE) IS
         BEGIN
             utl_file.put_line(f,'PROMPT '||pCmd);
@@ -431,86 +336,64 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
             END IF;          
         END;    
     BEGIN
-        log('CREATING DATAPUMP PARFILES AND BUILDING SCRIPT ' || TEMPFILE_PATH || '/migration_impdp.sh');
-        log('DATAPUMP LOGS ARE LOADED HERE WHEN JOBS COMPLETE. LIVE LOG FILE AT "'||TEMPFILE_PATH||'/migration.log"');
+        log('CREATING DATAPUMP PARFILES AND BUILDING CONTENT OF ' || TEMPFILE_PATH || '/migration_impdp.sh');
+        log('VIEW LIVE LOG FILE AT "'||TEMPFILE_PATH||'/migration.log"');
         
-        l_parfiles:=create_parfile(pOverride);
+        
+       /*
+        *  DETERMINE OPTIMAL MIGRATION METHOD
+        *
+        *    SOURCE DB >= 11.2.0.3    => TRANSPORTABLE DATABASE
+        *    SOURCE DB <  11.2.0.3    => TRANSPORTABLE TABLESPACE (COMPATIBILITY MUST BE > 10.0 FOR CROSS-PLATFORM MIGRATION)
+        */        
+        SELECT MAX(DECODE(what,'src',version)) src_version, MAX(DECODE(what,'src_compat',version)) src_compat, MAX(DECODE(what,'tgt',version)) tgt_version
+        INTO l_src_version_s, l_src_compat_s, l_tgt_version_s
+        FROM
+        (
+        SELECT 'tgt' what, version FROM product_component_version WHERE product LIKE 'Oracle%' AND ROWNUM=1
+        UNION ALL
+        SELECT 'src' what, version FROM product_component_version@MIGR_DBLINK WHERE product LIKE 'Oracle%'  AND ROWNUM=1
+        UNION ALL
+        SELECT 'src_compat' what, value FROM database_compatible_level@MIGR_DBLINK 
+        );  
+
+        l_src_version:=version(l_src_version_s);
+        l_src_compat:=version(l_src_compat_s);
+        l_tgt_version:=version(l_tgt_version_s);
+
+        IF (l_src_version >= version('12')) THEN
+            l_migration_method:='XTTS_DB';
+            l_compatible:='LATEST';
+        ELSIF (l_src_version >= version('11.2.0.3')) THEN
+            l_migration_method:='XTTS_DB';
+            l_compatible:='12';
+        ELSIF (l_src_version >= version('10.1.0.3') AND l_src_compat >= version('10.0')) THEN
+            l_migration_method:='XTTS_TS';
+            l_compatible:='LATEST';
+        END IF;
+
+        /* 
+         *   ONLY FOR ME TO TEST XTTS-TS (NON-XE VERSION 10 IS UNOBTAINABLE)
+         */
+        IF (pOverride) THEN
+            l_migration_method:='XTTS_TS';
+        END IF;
+        
+        create_impdp_parfile(l_migration_method, l_compatible, l_parfiles);
         
         f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration_impdp.sh', open_mode=>'w', max_linesize=>32767);
-        FOR C IN (SELECT TEMPFILE_PATH || '/' || REGEXP_SUBSTR(l_parfiles,'[^,]+', 1, level) parfile, level as lvl
-                    FROM dual
-                    CONNECT BY REGEXP_SUBSTR(l_parfiles, '[^,]+', 1, level) IS NOT NULL) 
-        LOOP
-            utl_file.put_line(f,'impdp /@' || PDBNAME || ' parfile=' || C.parfile); 
-            utl_file.put_line(f,'if [ $? -eq 1 ]');
-            utl_file.put_line(f,'then');
-            utl_file.put_line(f,'  echo "FAILURE RUNNING impdp parfile='|| C.parfile ||'"');
-            utl_file.put_line(f,'  exit 1');
-            utl_file.put_line(f,'fi');
-            utl_file.put_line(f,'sqlplus -s /@' || PDBNAME || '<<EOF');
-            IF (C.lvl<2) THEN
-                utl_file.put_line(f,'exec pck_migration_tgt.uploadLog('''||PDBNAME||'.impdp.log'')');
-            ELSE
-                utl_file.put_line(f,'exec pck_migration_tgt.uploadLog('''||PDBNAME||'.impdp.log.'||C.lvl||''')');
+        FOR i IN 1..l_parfiles.COUNT LOOP
+            IF (i=2) THEN
+                utl_file.put_line(f,'sqlplus -s /@' || PDBNAME || '<<EOF');
+                utl_file.put_line(f,'exec pck_migration_tgt.preCreateUserTS(''DROP'')');
+                utl_file.put_line(f,'EOF');
             END IF;
-            utl_file.put_line(f,'EOF');            
+            utl_file.put_line(f,'impdp /@' || PDBNAME || ' parfile=' || l_parfiles(i)); 
+            utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED impdp parfile='||l_parfiles(i)||'"; exit 1;}');
         END LOOP;
-        utl_file.fclose(f);
-        
-        f:=utl_file.fopen(location=>'TMPDIR', filename=>'migration_final.sh', open_mode=>'w', max_linesize=>32767);
-        utl_file.put_line(f,'sqlplus -s /nolog<<EOF');
-        utl_file.put_line(f,'whenever sqlerror exit failure');
-        utl_file.put_line(f,'set echo on');
-        utl_file.put_line(f,'connect /@' || PDBNAME); 
-        IF (pOverride='XTTS-TS') THEN
-            utl_file.put_line(f,'exec pck_migration_tgt.post_migration(pResetUser=>TRUE)');
-        ELSE
-            utl_file.put_line(f,'exec pck_migration_tgt.post_migration(pResetUser=>FALSE)');
-        END IF;
-        utl_file.put_line(f,'connect / as sysdba'); 
-        utl_file.put_line(f,'spool ' || TEMPFILE_PATH || '/' || PDBNAME||'.sys.log');
-        utl_file.put_line(f,'start ' || TEMPFILE_PATH || '/migration.sys.sql'); 
-        utl_file.put_line(f,'spool off');
-        utl_file.put_line(f,'connect /@' || PDBNAME); 
-        utl_file.put_line(f,'exec pck_migration_tgt.uploadLog('''||PDBNAME||'.sys.log'')');
-        utl_file.put_line(f,'exec pck_migration_tgt.log(''MIGRATION COMPLETED'',''-'')');
+        utl_file.put_line(f,'sqlplus -s /@' || PDBNAME || '<<EOF');
+        utl_file.put_line(f,'exec pck_migration_tgt.createFinal');
         utl_file.put_line(f,'EOF');
-        utl_file.put_line(f,'if [ $? -eq 1 ]');
-        utl_file.put_line(f,'then');
-        utl_file.put_line(f,'  echo "FAILURE RUNNING migration_final.sh"');
-        utl_file.put_line(f,'  exit 1');
-        utl_file.put_line(f,'fi');
-        utl_file.fclose(f);        
-
-        /*
-         *  Create SQLPLUS script that grants privileges on SYS-owned objects to migrated application users 
-         */
-        f:=utl_file.fopen(location=>'TMPDIR', filename=>'migration.sys.sql', open_mode=>'w', max_linesize=>32767);
-        
-        print_sqlcmd('ALTER SESSION SET CONTAINER='||PDBNAME||';');
-        
-        FOR C IN (
-            SELECT p.privilege, p.table_name, p.grantee, 
-                  (SELECT o.object_type FROM dba_objects@migr_dblink o WHERE o.owner=p.owner AND o.object_name=p.table_name AND o.object_type='DIRECTORY') dir
-              FROM dba_tab_privs@migr_dblink p, v_migration_users@migr_dblink u
-             WHERE p.owner='SYS'
-               AND p.grantee<>TRANSFER_USER
-               AND p.grantee=u.username
-               AND u.oracle_maintained='N'
-        ) 
-        LOOP
-            print_sqlcmd('GRANT '||C.privilege||' ON '||C.dir||' SYS.'||C.table_name||' TO '||C.grantee || ';');
-        END LOOP;
-        
-        /*
-         *  RECOMPILE ANY INVALID OBJECTS - COULD BE A FEW IF THESE WERE REFERENCING SYS-OWNED OBJECTS
-         */
-        print_sqlcmd('utl_recomp.recomp_serial();',TRUE);
-        
-        FOR C IN (SELECT repeat_interval FROM user_scheduler_jobs@MIGR_DBLINK WHERE job_name='MIGRATION_INCR') LOOP
-            print_sqlcmd('dbms_scheduler.stop_job(''PDBADMIN.MIGRATION'');',TRUE);
-        END LOOP;
-        
         utl_file.fclose(f);
         
         EXCEPTION
@@ -521,6 +404,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 log(sys.DBMS_UTILITY.format_call_stack);
                 RAISE;
     END;
+    
     
     --
     -- PROCEDURE file_copy
@@ -663,6 +547,59 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
             RPAD(TO_CHAR(l_sum_src/1024/1024,'99,999,990.0'),14) ||'|'||
             RPAD(TO_CHAR(l_sum_tgt/1024/1024,'99,999,990.0'),14),'-');
     END;
+    
+    
+    --
+    -- PROCEDURE createFinal
+    --   Creates content of script "migration_final.sh" 
+    --   Called after DATAPUMP job(s) are completed successfully
+    --
+    -------------------------------    
+    PROCEDURE createFinal IS
+        f utl_file.file_type;
+        l_oracle_sid VARCHAR2(20);
+    BEGIN
+        sys.dbms_system.get_env('ORACLE_SID',l_oracle_sid);
+        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration_final.sh', open_mode=>'w', max_linesize=>32767);
+        utl_file.put_line(f,'sqlplus -s /nolog<<EOF');
+        utl_file.put_line(f,'whenever sqlerror exit failure');
+        utl_file.put_line(f,'set echo on');
+        utl_file.put_line(f,'connect /@' || PDBNAME);
+        utl_file.put_line(f,'exec pck_migration_tgt.final');  
+        utl_file.put_line(f,'connect /@' || l_oracle_sid || ' AS SYSDBA'); 
+        utl_file.put_line(f,'ALTER SESSION SET CONTAINER='||PDBNAME||';');
+        FOR C IN (
+            SELECT p.privilege, p.table_name, p.grantee, 
+                  (SELECT o.object_type FROM dba_objects@migr_dblink o WHERE o.owner=p.owner AND o.object_name=p.table_name AND o.object_type='DIRECTORY') dir
+              FROM dba_tab_privs@migr_dblink p, v_migration_users@migr_dblink u
+             WHERE p.owner='SYS'
+               AND p.grantee=u.username
+               AND u.oracle_maintained='N'
+        ) 
+        LOOP
+            utl_file.put_line(f,'GRANT '||C.privilege||' ON '||C.dir||' SYS.'||C.table_name||' TO '||C.grantee || ';');
+        END LOOP;        
+        utl_file.put_line(f,'exec utl_recomp.recomp_serial()');
+        FOR C IN (SELECT repeat_interval FROM user_scheduler_jobs@MIGR_DBLINK WHERE job_name='MIGRATION_INCR') LOOP
+            utl_file.put_line(f,'exec dbms_scheduler.stop_job(''PDBADMIN.MIGRATION'');',TRUE);
+        END LOOP;        
+        
+        utl_file.put_line(f,'exec pck_migration_tgt.log(''MIGRATION COMPLETED'',''-'')');
+        utl_file.put_line(f,'EOF');
+        utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED in migration_final.sh"; exit 1;}');
+        utl_file.fclose(f);        
+        
+        utl_file.fclose(f);
+        
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF (utl_file.is_open(f)) THEN utl_file.fclose(f); END IF;
+                log('ABORTED MIGRATION JOB - '||SQLCODE||' - '||SUBSTR(sqlerrm,1,4000));
+                log(sys.DBMS_UTILITY.format_error_backtrace);
+                log(sys.DBMS_UTILITY.format_call_stack);
+                RAISE;        
+    END;
+    
     
     -------------------------------
     PROCEDURE final IS
@@ -920,8 +857,49 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
          END LOOP;
     END;
     
+    --
+    -- PROCEDURE checkCharsets
+    --   Check that source and target database character sets match
+    --  
+    -------------------------------
+    PROCEDURE checkCharsets IS
+        l_mismatch VARCHAR2(200):=NULL;
+        l_error VARCHAR2(500);
+        l_convDB BOOLEAN;
+    BEGIN
+        FOR C IN (
+            SELECT COUNT(src) src, COUNT(tgt) tgt, property_name, property_value
+            FROM
+            (
+            SELECT 1 tgt, TO_NUMBER(NULL) src, property_name, property_value 
+            FROM database_properties WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+            UNION ALL
+            SELECT TO_NUMBER(NULL) tgt, 1 src, property_name, property_value 
+            FROM database_properties@MIGR_DBLINK WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+            )
+            GROUP BY property_name, property_value
+            ) 
+        LOOP
+            IF (C.tgt=1 AND C.src=1) THEN
+                CONTINUE;
+            END IF;
+            IF (C.src=1) THEN
+                l_mismatch:=l_mismatch||' SOURCE '||C.property_name||':'||C.property_value;
+            ELSE
+                l_mismatch:=l_mismatch||' TARGET '||C.property_name||':'||C.property_value;
+            END IF;
+        END LOOP;
+        
+        IF (l_mismatch IS NOT NULL) THEN
+            l_error:='CHARACTER SET MISMATCH'||l_mismatch;
+            log(l_error);
+            RAISE_APPLICATION_ERROR(-20000,l_error);
+        END IF;
+    END;    
+    
+    
     /*
-     *  HERE'S WHERE THE PROCESS STARTS
+     *  INITIATE DATA FILE TRANSFER
      */
     -------------------------------
     PROCEDURE transfer IS 
@@ -932,6 +910,11 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         l_oracle_home VARCHAR2(200);
         l_sqlplus_logfile VARCHAR2(50):=PDBNAME||'.sqlplus.log';
     BEGIN
+        /*
+         *   CHECK SOURCE AND TARGET CHARACTERSETS ARE THE SAME. WILL ABORT IF NOT. 
+         */
+        checkCharsets;
+        
         /*
          *  CHECK THAT SOURCE TABLESPACES ARE READ ONLY IF THIS IS A DIRECT MiGRATION
          */
@@ -1012,23 +995,10 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
             VALUES (s.recid, s.file_id, s.bp_file_name, s.directory_name, s.bytes);  
 
         COMMIT;
-                 
-        FOR C IN (SELECT NULL FROM database_properties WHERE property_name='NLS_CHARACTERSET' AND property_value<>'AL32UTF8') LOOP
-            checkCharsets;
-        END LOOP;
         
         log_details;
         
         file_copy;
-        
-        FOR C IN (SELECT COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0)) all_readonly FROM migration_ts@MIGR_DBLINK WHERE from_scn IS NOT NULL)
-        LOOP
-            apply_incremental;
-            IF (C.all_readonly>0) THEN
-                log('ROLLED FORWARD INCREMENTAL BACKUPS');
-                RETURN;
-            END IF;
-        END LOOP;
     END;
     
 BEGIN
