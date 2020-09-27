@@ -244,9 +244,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
             WHEN (pMigration='XTTS_TS') THEN
                 --
                 -- 1. Users/Roles/Profiles/Role grants export / import
-                --
-                preCreateUserTS('CREATE');
-                                
+                --              
                 log:=openParfile('Import USER,ROLE,ROLE_GRANT,PROFILE','.1');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
@@ -261,7 +259,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 --
                 -- 2. TTS export / import
                 --
-                log:=openParfile('Import TABLESPACES','2');             
+                log:=openParfile('Import TABLESPACES','.2');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
                 utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
@@ -283,7 +281,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 --
                 -- 3. Full metadata only export / import
                 --
-                log:=openParfile('Import remaining METADATA','3');             
+                log:=openParfile('Import remaining METADATA','.3');             
                 
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
                 utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
@@ -339,7 +337,6 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         log('CREATING DATAPUMP PARFILES AND BUILDING CONTENT OF ' || TEMPFILE_PATH || '/migration_impdp.sh');
         log('VIEW LIVE LOG FILE AT "'||TEMPFILE_PATH||'/migration.log"');
         
-        
        /*
         *  DETERMINE OPTIMAL MIGRATION METHOD
         *
@@ -381,17 +378,27 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         
         create_impdp_parfile(l_migration_method, l_compatible, l_parfiles);
         
-        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration_impdp.sh', open_mode=>'w', max_linesize=>32767);
+        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'runMigration.' ||PDBNAME || '.impdp.sh', open_mode=>'w', max_linesize=>32767);
+        if (l_parfiles.COUNT>1) THEN
+                utl_file.put_line(f,'sqlplus /@' || PDBNAME||'<<EOF');
+                utl_file.put_line(f,'whenever sqlerror exit failure');
+                utl_file.put_line(f,'exec pck_migration_tgt.preCreateUserTS(''CREATE'')');
+                utl_file.put_line(f,'exit');
+                utl_file.put_line(f,'EOF');
+        END IF;
+        
         FOR i IN 1..l_parfiles.COUNT LOOP
             IF (i=2) THEN
-                utl_file.put_line(f,'sqlplus -s /@' || PDBNAME || '<<EOF');
+                utl_file.put_line(f,'sqlplus /@' || PDBNAME||'<<EOF');
+                utl_file.put_line(f,'whenever sqlerror exit failure');
                 utl_file.put_line(f,'exec pck_migration_tgt.preCreateUserTS(''DROP'')');
+                utl_file.put_line(f,'exit');
                 utl_file.put_line(f,'EOF');
             END IF;
             utl_file.put_line(f,'impdp /@' || PDBNAME || ' parfile=' || l_parfiles(i)); 
             utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED impdp parfile='||l_parfiles(i)||'"; exit 1;}');
         END LOOP;
-        utl_file.put_line(f,'sqlplus -s /@' || PDBNAME || '<<EOF');
+        utl_file.put_line(f,'sqlplus /@' || PDBNAME || '<<EOF');
         utl_file.put_line(f,'exec pck_migration_tgt.createFinal');
         utl_file.put_line(f,'EOF');
         utl_file.fclose(f);
@@ -560,14 +567,14 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         l_oracle_sid VARCHAR2(20);
     BEGIN
         sys.dbms_system.get_env('ORACLE_SID',l_oracle_sid);
-        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration_final.sh', open_mode=>'w', max_linesize=>32767);
-        utl_file.put_line(f,'sqlplus -s /nolog<<EOF');
+        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration.'||PDBNAME||'.final.sh', open_mode=>'w', max_linesize=>32767);
+        utl_file.put_line(f,'sqlplus /nolog<<EOF');
         utl_file.put_line(f,'whenever sqlerror exit failure');
         utl_file.put_line(f,'set echo on');
         utl_file.put_line(f,'connect /@' || PDBNAME);
         utl_file.put_line(f,'exec pck_migration_tgt.final');  
         utl_file.put_line(f,'connect /@' || l_oracle_sid || ' AS SYSDBA'); 
-        utl_file.put_line(f,'ALTER SESSION SET CONTAINER='||PDBNAME||';');
+        utl_file.put_line(f,'alter session set container='||PDBNAME||';');
         FOR C IN (
             SELECT p.privilege, p.table_name, p.grantee, 
                   (SELECT o.object_type FROM dba_objects@migr_dblink o WHERE o.owner=p.owner AND o.object_name=p.table_name AND o.object_type='DIRECTORY') dir
@@ -586,10 +593,8 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         
         utl_file.put_line(f,'exec pck_migration_tgt.log(''MIGRATION COMPLETED'',''-'')');
         utl_file.put_line(f,'EOF');
-        utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED in migration_final.sh"; exit 1;}');
+        utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED in migration.'||PDBNAME||'.final.sh"; exit 1;}');
         utl_file.fclose(f);        
-        
-        utl_file.fclose(f);
         
         EXCEPTION
             WHEN OTHERS THEN

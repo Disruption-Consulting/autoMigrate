@@ -108,7 +108,7 @@ createCredential() {
     local SVC="${4}"
     
     local WPW=$(runsql -v -s "SELECT log_message FROM ${USER}.migration_log WHERE name='WPW';")
-    chkerr "$?" "${LINENO}" "${VERSION}"
+    chkerr "$?" "${LINENO}" "${WPW}"
     
     mkstore -wrl "${WALLET}" -createCredential "${TNS}" "${USR}" "${PWD}"<<EOF
 ${WPW}
@@ -121,6 +121,22 @@ ${TNS}=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=1521))(CONNECT_
 EOF
     fi
 }
+
+deleteCredential() {
+    log "deleteCredential - ${1}"
+    
+    local TNS="${1}"
+    
+    local WPW=$(runsql -v -s "SELECT log_message FROM ${USER}.migration_log WHERE name='WPW';")
+    chkerr "$?" "${LINENO}" "${WPW}"
+    
+    mkstore -wrl "${WALLET}" -deleteCredential "${TNS}"<<EOF
+${WPW}
+EOF    
+
+    sed -i '/^${TNS}/d' ${TNSNAMES}
+}
+
 
 removeSource() {
     log "removeSource"
@@ -175,7 +191,7 @@ createSourceSchema(){
     local V12=$(version "12")
     local PRIV
     
-    [[ ${VTHIS} < ${V11} ]] && PRIV=EXP_FULL_DATABASE || PRIV=DATAPUMP_EXP_FULL_DATABASE
+    [[ ${THISDB} < ${V11} ]] && PRIV=EXP_FULL_DATABASE || PRIV=DATAPUMP_EXP_FULL_DATABASE
 
     cat <<-EOF>${SQLFILE}
         CONNECT / AS SYSDBA
@@ -233,7 +249,7 @@ createSourceSchema(){
         COMMIT;
 EOF
 
-    if [[ ${VTHIS} < ${V12} ]]; then
+    if [[ ${THISDB} < ${V12} ]]; then
         cat <<-EOF>>${SQLFILE}
             GRANT SELECT ON SYS.KU_NOEXP_TAB  TO ${USER};
             GRANT SELECT ON SYSTEM.LOGSTDBY\$SKIP_SUPPORT TO ${USER};    
@@ -356,6 +372,7 @@ createCommonUser() {
     GRANT SELECT ON SYS.CDB_DATA_FILES TO ${USER};
     GRANT SELECT ON SYS.CDB_DIRECTORIES TO ${USER};
     GRANT SELECT ON SYS.CDB_PDBS TO ${USER};
+    GRANT SELECT ON SYS.V_\$PDBS TO ${USER};
     ALTER SESSION SET CURRENT_SCHEMA=${USER};
     CREATE SEQUENCE migration_log_seq START WITH 1 INCREMENT BY 1;
     CREATE TABLE migration_log(
@@ -372,6 +389,24 @@ EOF
 
 removeTarget() {
     log "removeTarget"
+    
+    local FILEPATH=$(runsql -v -s "SELECT DISTINCT SUBSTR(f.file_name,1,INSTR(f.file_name,'/',-1)) FROM cdb_data_files f, v\$pdbs p WHERE f.con_id=p.con_id AND p.name='${PDB}';");
+    chkerr "$?" "${LINENO}" "${FILEPATH}"
+    
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${ORACLE_SID}
+        COL filepath NEW_VALUE filepath noprint;
+        SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1))) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
+        WHENEVER SQLERROR CONTINUE
+        ALTER PLUGGABLE DATABASE ${PDB} CLOSE IMMEDIATE;
+        WHENEVER SQLERROR EXIT FAILURE
+        DROP PLUGGABLE DATABASE ${PDB} INCLUDING DATAFILES;
+EOF
+    runsql || { echo "removeTarget FAILED"; exit 1; }
+    
+    deleteCredential "${PDB}"
+    
+    echo "rm -v ${FILEPATH}/*"
 }
 
 
@@ -389,7 +424,7 @@ createTargetSchema() {
     DBLINKPWD=${CRED#*/}
     
     cat <<-EOF>${SQLFILE}
-        CONNECT /@${USER} AS SYSDBA
+        CONNECT /@${ORACLE_SID} AS SYSDBA
         CREATE PLUGGABLE DATABASE ${PDB} ADMIN USER PDBADMIN IDENTIFIED BY ${PW} ROLES=(DATAPUMP_IMP_FULL_DATABASE) FILE_NAME_CONVERT=('pdbseed','${PDB}');
         ALTER USER ${USER} SET CONTAINER_DATA = (CDB\$ROOT, ${PDB}) CONTAINER=CURRENT;
         ALTER SESSION SET CONTAINER=${PDB};
@@ -472,7 +507,7 @@ createTargetSchema() {
         GRANT SELECT, UPDATE ON PDBADMIN.MIGRATION_BP TO ${USER} CONTAINER=CURRENT;
         GRANT SELECT ON PDBADMIN.migration_log_seq TO ${USER} CONTAINER=CURRENT;
         GRANT SELECT, INSERT ON PDBADMIN.MIGRATION_LOG TO ${USER} CONTAINER=CURRENT;
-        CONNECT /@${USER}
+        CONNECT /@${ORACLE_SID}
         WHENEVER SQLERROR CONTINUE
         DROP DATABASE LINK PDB_DBLINK;
         WHENEVER SQLERROR EXIT FAILURE
@@ -494,20 +529,30 @@ EOF
 }
 
 
-runTargetMigration() {
-    log "runTargetMigration"
+createTargetRunScripts() {
+    log "createTargetRunScripts"
     
-    local RUNSCRIPT="${FN}.${PDB}"
+    local RUNSCRIPT="${1}"
     
     cat <<-EOF>${RUNSCRIPT}.sql
         whenever sqlerror exit failure
         connect /@${PDB}
-        exec pck_migration_tgt.transfer
+            exec pck_migration_tgt.transfer
+            col all_ts_readonly new_value all_ts_readonly noprint
+            SELECT TO_CHAR(COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0))) all_ts_readonly FROM migration_ts;
+        connect /@${ORACLE_SID}
+            exec pck_migration_rollforward.apply
+        connect /@PDB1
+            begin
+                if ('&all_ts_readonly'='0') then
+                    pck_migration_tgt.impdp;
+                end if;
+            end;
+            /
         exit
 EOF
 
     cat /dev/null>${RUNSCRIPT}.impdp.sh
-    cat /dev/null>${RUNSCRIPT}.final.sh
     
     cat <<-EOF>${RUNSCRIPT}.sh
 #!/bin/bash
@@ -517,10 +562,39 @@ export ORACLE_SID=${ORACLE_SID}
 export PATH=\${ORACLE_HOME}/bin:${PATH}
 export TNS_ADMIN=${CD}
 sqlplus /nolog @${RUNSCRIPT}.sql
-. /opt/oracle/oradata/migration_impdp.sh
-. /opt/oracle/oradata/migration_final.sh
+. ${RUNSCRIPT}.impdp.sh
+. ${RUNSCRIPT}.final.sh
 exit 0
 EOF
+    chmod u+x ${RUNSCRIPT}.sh    
+}
+
+
+runTargetMigration() {
+    log "runTargetMigration"
+    
+    local RUNSCRIPT="${CD}/${FN}.${PDB}"
+    
+    [[ -f "${RUNSCRIPT}.sh" ]] || createTargetRunScripts "${RUNSCRIPT}"
+
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${ORACLE_SID} AS SYSDBA
+        ALTER SESSION SET CONTAINER=${PDB};
+        DECLARE
+            l_repeat_interval user_scheduler_jobs.repeat_interval%type;
+        BEGIN
+            SELECT MAX(repeat_interval) INTO l_repeat_interval FROM user_scheduler_jobs@migr_dblink;
+            DBMS_SCHEDULER.CREATE_JOB(
+                job_name=>'MIGRATION',
+                job_type=>'EXECUTABLE',
+                start_date=>SYSTIMESTAMP,
+                enabled=>TRUE,
+                job_action=>'${RUNSCRIPT}.sh',
+                repeat_interval=>l_repeat_interval);
+        END;
+        /
+EOF
+    runsql || { echo "runTargetMigration FAILED"; exit 1; }
 }
 
 
@@ -537,15 +611,12 @@ processTarget() {
         exit 1
     fi
     
-    if [ "${REMOVE}" = "TRUE" ]; then
-        removeTarget
-        exit 0
-    fi
+    [[ "${REMOVE}" = "TRUE" ]] && { removeTarget; exit 0; }
     
     local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM cdb_pdbs WHERE pdb_name='${PDB}');")
     chkerr "$?" "${LINENO}" "${EXISTS}"
     
-    [[ "${EXISTS}" = "0" ]] && createTargetSchema || runTargetMigration    
+    [[ "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; } || runTargetMigration    
 }
 
 
@@ -557,7 +628,7 @@ processTarget() {
 VERSION=$(runsql -v -s "SELECT MAX(REGEXP_SUBSTR(banner,'\d+.\d+.\d+.\d+')) FROM v\$version;")
 chkerr "$?" "${LINENO}" "${VERSION}"
 
-VTHIS=$(version "${VERSION}")
+THISDB=$(version "${VERSION}")
 
 [[ ${VERSION} = 19* ]] && DB=TARGET || DB=SOURCE
 
