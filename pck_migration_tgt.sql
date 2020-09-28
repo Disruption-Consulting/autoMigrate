@@ -2,9 +2,9 @@ create or replace PACKAGE PDBADMIN.pck_migration_tgt AS
     --
     PROCEDURE transfer;
     --
-    PROCEDURE impdp(pOverride IN BOOLEAN DEFAULT FALSE);
+    PROCEDURE impdp(pOverride IN BOOLEAN DEFAULT FALSE, pDbmsStats IN BOOLEAN DEFAULT TRUE);
     --
-    PROCEDURE final;
+    PROCEDURE final(pDbmsStats IN BOOLEAN DEFAULT TRUE);
     --
     PROCEDURE preCreateUserTS(pAction IN VARCHAR2);
     --
@@ -80,7 +80,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     -- 
     -- PROCEDURE log
     --   Logs the message passed as a VARCHAR2
-    --
+    --      
     -------------------------------
     PROCEDURE log(pMessage IN VARCHAR2, pChar IN VARCHAR2 DEFAULT NULL) IS
     BEGIN
@@ -173,12 +173,13 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     -------------------------------
     PROCEDURE preCreateUserTS(pAction IN VARCHAR2) IS
         l_ddl VARCHAR2(500);
+        l_fname VARCHAR2(32):=SYS_GUID();
     BEGIN                                                
         FOR C IN (SELECT DISTINCT default_tablespace 
                     FROM dba_users@migr_dblink
                    WHERE default_tablespace IN (SELECT tablespace_name FROM V_app_tablespaces@migr_dblink)) LOOP
             IF (pAction='CREATE') THEN
-                l_ddl:='CREATE TABLESPACE '||C.default_tablespace||' DATAFILE '''||DATAFILE_PATH||'/'||LOWER(C.default_tablespace||'.dbf'' SIZE 1M');
+                l_ddl:='CREATE TABLESPACE '||C.default_tablespace||' DATAFILE '''||DATAFILE_PATH||'/'||l_fname||C.default_tablespace||'.dbf'' SIZE 1M';
             ELSE
                 l_ddl:='DROP TABLESPACE '||C.default_tablespace||' INCLUDING CONTENTS AND DATAFILES';
             END IF;
@@ -196,7 +197,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         log VARCHAR2(100);
         
         FUNCTION openParfile(pDescription IN VARCHAR2, pSuffix IN VARCHAR2 DEFAULT NULL) RETURN VARCHAR2 IS
-            l_filename VARCHAR2(100):='migration.'||PDBNAME||pSuffix||'.parfile';
+            l_filename VARCHAR2(100):='runMigration.'||PDBNAME||pSuffix||'.parfile';
         BEGIN
             f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>l_filename, open_mode=>'w', max_linesize=>32767);
             utl_file.put_line(f,RPAD('#',LENGTH(pDescription)+15,'#'));
@@ -220,8 +221,8 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 utl_file.put_line(f,'LOGTIME=ALL');
                 utl_file.put_line(f,'EXCLUDE=TABLE_STATISTICS,INDEX_STATISTICS');
                 utl_file.put_line(f,'EXCLUDE=TABLESPACE:"IN (''UNDOTBS1'', ''TEMP'')"');
-                utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE''MIGRATION_FILES_%''"');
-                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'')"');
+                utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE'''||TRANSFER_USER||'%''"');
+                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'' UNION ALL SELECT '''||TRANSFER_USER||''' FROM dual)"');
                 utl_file.put_line(f,'METRICS=Y');
                 utl_file.put_line(f,'FULL=Y');
                 utl_file.put_line(f,'TRANSPORTABLE=ALWAYS');
@@ -266,7 +267,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 utl_file.put_line(f,'LOGTIME=ALL');    
                 utl_file.put_line(f,'EXCLUDE=TABLE_STATISTICS,INDEX_STATISTICS');
                 utl_file.put_line(f,'METRICS=Y');
-                utl_file.put_line(f,'TRANSPORT_FULL_CHECK=Y');
+                utl_file.put_line(f,'TRANSPORT_FULL_CHECK=N');
                 
                 FOR C IN (SELECT DISTINCT tablespace_name FROM migration_ts WHERE migration_status='TRANSFER COMPLETED' ORDER BY 1) LOOP
                     utl_file.put_line(f,'TRANSPORT_TABLESPACES='''||C.tablespace_name||'''');
@@ -286,9 +287,9 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
                 utl_file.put_line(f,'NETWORK_LINK=MIGR_DBLINK');
                 utl_file.put_line(f,'LOGFILE=MIGRATION_SCRIPT_DIR:'||log);
                 utl_file.put_line(f,'LOGTIME=ALL');    
-                utl_file.put_line(f,'EXCLUDE=USER,ROLE,ROLE_GRANT,PROFILE,TABLE_STATISTICS,INDEX_STATISTICS');
-                utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE''MIGRATION_FILES_%''"');
-                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'')"');
+                utl_file.put_line(f,'EXCLUDE=USER,ROLE,ROLE_GRANT,PROFILE,TABLESPACE,TABLE_STATISTICS,INDEX_STATISTICS');
+                utl_file.put_line(f,'EXCLUDE=DIRECTORY:"LIKE'''||TRANSFER_USER||'%''"');
+                utl_file.put_line(f,'EXCLUDE=SCHEMA:"IN (SELECT username FROM v_migration_users WHERE oracle_maintained=''Y'' UNION ALL SELECT '''||TRANSFER_USER||''' FROM dual)"');
                 utl_file.put_line(f,'METRICS=Y');
                 utl_file.put_line(f,'FULL=Y');
                 utl_file.put_line(f,'CONTENT=METADATA_ONLY');
@@ -309,7 +310,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     --   Create datapump parfiles to be referenced in external job that performs the migration
     --    
     -------------------------------    
-    PROCEDURE impdp(pOverride IN BOOLEAN) IS
+    PROCEDURE impdp(pOverride IN BOOLEAN, pDbmsStats IN BOOLEAN) IS
         l_src_version_s VARCHAR2(20);
         l_src_compat_s VARCHAR2(20);
         l_tgt_version_s VARCHAR2(20);
@@ -319,6 +320,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         l_migration_method VARCHAR2(7);
         l_compatible VARCHAR2(10);
         l_parfiles SYS.ODCIVARCHAR2LIST:=SYS.ODCIVARCHAR2LIST();
+        l_ddl VARCHAR2(250);
         f utl_file.file_type;
         ----------------------
         PROCEDURE print_sqlcmd(pCmd IN VARCHAR2,pBlock IN BOOLEAN DEFAULT FALSE) IS
@@ -334,9 +336,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
             END IF;          
         END;    
     BEGIN
-        log('CREATING DATAPUMP PARFILES AND BUILDING CONTENT OF ' || TEMPFILE_PATH || '/migration_impdp.sh');
-        log('VIEW LIVE LOG FILE AT "'||TEMPFILE_PATH||'/migration.log"');
-        
+        log('CREATING DATAPUMP PARFILES AND BUILDING CONTENT OF ' || TEMPFILE_PATH || '/runMigration_impdp.sh');
        /*
         *  DETERMINE OPTIMAL MIGRATION METHOD
         *
@@ -380,27 +380,76 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         
         f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'runMigration.' ||PDBNAME || '.impdp.sh', open_mode=>'w', max_linesize=>32767);
         if (l_parfiles.COUNT>1) THEN
+                utl_file.put_line(f,'echo "Pre-create dummy USER tablespaces for XTTTS-TS"');
                 utl_file.put_line(f,'sqlplus /@' || PDBNAME||'<<EOF');
                 utl_file.put_line(f,'whenever sqlerror exit failure');
-                utl_file.put_line(f,'exec pck_migration_tgt.preCreateUserTS(''CREATE'')');
+                l_ddl:='exec pck_migration_tgt.preCreateUserTS(''CREATE'')';
+                utl_file.put_line(f,'PROMPT '||l_ddl); 
+                utl_file.put_line(f,l_ddl);
                 utl_file.put_line(f,'exit');
                 utl_file.put_line(f,'EOF');
+                utl_file.put_line(f,'[[ $? != 0 ]] && { echo "FAILED pck_migration_tgt.preCreateUserTS(CREATE)"; exit 1; }');
         END IF;
         
         FOR i IN 1..l_parfiles.COUNT LOOP
             IF (i=2) THEN
+                utl_file.put_line(f,'echo "Drop dummy USER tablespaces"');
                 utl_file.put_line(f,'sqlplus /@' || PDBNAME||'<<EOF');
                 utl_file.put_line(f,'whenever sqlerror exit failure');
-                utl_file.put_line(f,'exec pck_migration_tgt.preCreateUserTS(''DROP'')');
+                l_ddl:='exec pck_migration_tgt.preCreateUserTS(''DROP'')';
+                utl_file.put_line(f,'PROMPT '||l_ddl); 
+                utl_file.put_line(f,l_ddl);
                 utl_file.put_line(f,'exit');
                 utl_file.put_line(f,'EOF');
+                utl_file.put_line(f,'[[ $? != 0 ]] && { echo "FAILED pck_migration_tgt.preCreateUserTS(DROP)"; exit 1; }');
             END IF;
-            utl_file.put_line(f,'impdp /@' || PDBNAME || ' parfile=' || l_parfiles(i)); 
-            utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED impdp parfile='||l_parfiles(i)||'"; exit 1;}');
+            utl_file.put_line(f,'impdp /@' || PDBNAME || ' parfile=' || TEMPFILE_PATH || '/' ||l_parfiles(i)); 
+            utl_file.put_line(f,'[[ $? = 1 ]] && { echo "FAILED impdp parfile='||l_parfiles(i)||'"; exit 1; }');
         END LOOP;
+        
         utl_file.put_line(f,'sqlplus /@' || PDBNAME || '<<EOF');
-        utl_file.put_line(f,'exec pck_migration_tgt.createFinal');
+        utl_file.put_line(f,'whenever sqlerror exit failure');
+        utl_file.put_line(f,'set echo on');
+        IF (pDbmsStats) THEN
+            l_ddl:='exec pck_migration_tgt.final(pDbmsStats=>TRUE)';
+        ELSE
+            l_ddl:='exec pck_migration_tgt.final(pDbmsStats=>FALSE)';
+        END IF;
+        utl_file.put_line(f,'PROMPT '||l_ddl);
+        utl_file.put_line(f,l_ddl);
         utl_file.put_line(f,'EOF');
+        utl_file.put_line(f,'[[ $? != 0 ]] && { echo "FAILED pck_migration_tgt.final"; exit 1; }');
+        
+        utl_file.put_line(f,'sqlplus /@${ORACLE_SID} AS SYSDBA<<EOF');
+        utl_file.put_line(f,'whenever sqlerror exit failure');
+        utl_file.put_line(f,'set echo on');
+        utl_file.put_line(f,'alter session set container='||PDBNAME||';');
+        FOR C IN (
+            SELECT p.privilege, REPLACE(p.table_name,'$','\$') table_name, p.grantee, 
+                  (SELECT o.object_type FROM dba_objects@migr_dblink o WHERE o.owner=p.owner AND o.object_name=p.table_name AND o.object_type='DIRECTORY') dir
+              FROM dba_tab_privs@migr_dblink p, v_migration_users@migr_dblink u
+             WHERE p.owner='SYS'
+               AND p.grantee=u.username
+               AND u.oracle_maintained='N'
+               AND u.username<>TRANSFER_USER
+        ) 
+        LOOP
+            l_ddl:='GRANT '||C.privilege||' ON '||C.dir||' SYS.'||C.table_name||' TO '||C.grantee || ';';
+            utl_file.put_line(f,'PROMPT '||l_ddl);
+            utl_file.put_line(f,l_ddl);
+        END LOOP;        
+        l_ddl:='exec utl_recomp.recomp_serial()';
+        utl_file.put_line(f,'PROMPT '||l_ddl);
+        utl_file.put_line(f,l_ddl);
+        FOR C IN (SELECT repeat_interval FROM user_scheduler_jobs@MIGR_DBLINK WHERE job_name='MIGRATION_INCR') LOOP
+            l_ddl:='exec dbms_scheduler.stop_job(''PDBADMIN.MIGRATION'',TRUE)';
+            utl_file.put_line(f,'PROMPT '||l_ddl);
+            utl_file.put_line(f,l_ddl);
+        END LOOP;        
+        --utl_file.put_line(f,'exec pdbadmin.pck_migration_tgt.log(''MIGRATION COMPLETED'',''-'')');
+        utl_file.put_line(f,'EOF');
+        utl_file.put_line(f,'[[ $? = 0 ]] && { echo "MIGRATION COMPLETED SUCCESSFULLLY"; } || { echo "FAILED in migration.'||PDBNAME||'.impdp.sh"; exit 1; }');
+        
         utl_file.fclose(f);
         
         EXCEPTION
@@ -556,58 +605,8 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     END;
     
     
-    --
-    -- PROCEDURE createFinal
-    --   Creates content of script "migration_final.sh" 
-    --   Called after DATAPUMP job(s) are completed successfully
-    --
-    -------------------------------    
-    PROCEDURE createFinal IS
-        f utl_file.file_type;
-        l_oracle_sid VARCHAR2(20);
-    BEGIN
-        sys.dbms_system.get_env('ORACLE_SID',l_oracle_sid);
-        f:=utl_file.fopen(location=>'MIGRATION_SCRIPT_DIR', filename=>'migration.'||PDBNAME||'.final.sh', open_mode=>'w', max_linesize=>32767);
-        utl_file.put_line(f,'sqlplus /nolog<<EOF');
-        utl_file.put_line(f,'whenever sqlerror exit failure');
-        utl_file.put_line(f,'set echo on');
-        utl_file.put_line(f,'connect /@' || PDBNAME);
-        utl_file.put_line(f,'exec pck_migration_tgt.final');  
-        utl_file.put_line(f,'connect /@' || l_oracle_sid || ' AS SYSDBA'); 
-        utl_file.put_line(f,'alter session set container='||PDBNAME||';');
-        FOR C IN (
-            SELECT p.privilege, p.table_name, p.grantee, 
-                  (SELECT o.object_type FROM dba_objects@migr_dblink o WHERE o.owner=p.owner AND o.object_name=p.table_name AND o.object_type='DIRECTORY') dir
-              FROM dba_tab_privs@migr_dblink p, v_migration_users@migr_dblink u
-             WHERE p.owner='SYS'
-               AND p.grantee=u.username
-               AND u.oracle_maintained='N'
-        ) 
-        LOOP
-            utl_file.put_line(f,'GRANT '||C.privilege||' ON '||C.dir||' SYS.'||C.table_name||' TO '||C.grantee || ';');
-        END LOOP;        
-        utl_file.put_line(f,'exec utl_recomp.recomp_serial()');
-        FOR C IN (SELECT repeat_interval FROM user_scheduler_jobs@MIGR_DBLINK WHERE job_name='MIGRATION_INCR') LOOP
-            utl_file.put_line(f,'exec dbms_scheduler.stop_job(''PDBADMIN.MIGRATION'');',TRUE);
-        END LOOP;        
-        
-        utl_file.put_line(f,'exec pck_migration_tgt.log(''MIGRATION COMPLETED'',''-'')');
-        utl_file.put_line(f,'EOF');
-        utl_file.put_line(f,'[[ $? != 0 ]] && {echo "FAILED in migration.'||PDBNAME||'.final.sh"; exit 1;}');
-        utl_file.fclose(f);        
-        
-        EXCEPTION
-            WHEN OTHERS THEN
-                IF (utl_file.is_open(f)) THEN utl_file.fclose(f); END IF;
-                log('ABORTED MIGRATION JOB - '||SQLCODE||' - '||SUBSTR(sqlerrm,1,4000));
-                log(sys.DBMS_UTILITY.format_error_backtrace);
-                log(sys.DBMS_UTILITY.format_call_stack);
-                RAISE;        
-    END;
-    
-    
     -------------------------------
-    PROCEDURE final IS
+    PROCEDURE final(pDbmsStats IN BOOLEAN) IS
     --
     -- PROCEDURE final
     --   1. Set tablespaces to pre-migration status
@@ -771,11 +770,16 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
         /*
          *  GATHER STATS IN BACKGROUND
          */
-        log('SUBMITTING STATISTICS JOBS','-');
-        log('... n.b. monitor with "SELECT target_desc,message FROM v$session_longops WHERE time_remaining>0;"');
-        submit_stats_job('gather_database_stats');
-        submit_stats_job('gather_fixed_objects_stats');
-        submit_stats_job('gather_dictionary_stats');
+        IF (pDbmsStats) THEN
+            log('SUBMITTING STATISTICS JOBS','-');
+            log('... n.b. monitor with "SELECT target_desc,message FROM v$session_longops WHERE time_remaining>0;"');
+
+            submit_stats_job('gather_database_stats');
+            submit_stats_job('gather_fixed_objects_stats');
+            submit_stats_job('gather_dictionary_stats');
+        ELSE
+            log('STATS NOT ANALYZED BY REQUEST','*');
+        END IF;
         
         /*
          *  DROP OBJECTS USED ONLY FOR MIGRATION WHICH HAVE BEEN IMPORTED FROM SOURCE DATABASE
@@ -909,7 +913,6 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     -------------------------------
     PROCEDURE transfer IS 
         n PLS_INTEGER;
-        l_parfiles VARCHAR2(1000);
         f utl_file.file_type;
         l_oracle_sid VARCHAR2(20);
         l_oracle_home VARCHAR2(200);
@@ -1003,7 +1006,7 @@ create or replace PACKAGE BODY PDBADMIN.pck_migration_tgt AS
     
 BEGIN
     /*
-     *  SET TRANSFER_USER GLOBAL VARIABLE. MIGR_DBLINK CREATED IN CALLING SCRIPT "tgt_migr.sql"
+     *  SET GLOBAL VARIABLES
      */
     SELECT username INTO TRANSFER_USER FROM all_db_links WHERE owner='PUBLIC' AND db_link='MIGR_DBLINK';    
     SELECT directory_path INTO DATAFILE_PATH FROM all_directories WHERE directory_name='TGT_FILES_DIR';

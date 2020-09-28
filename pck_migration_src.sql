@@ -1,6 +1,6 @@
 CREATE OR REPLACE PACKAGE pck_migration_src AS
     --
-    PROCEDURE init_migration (
+    PROCEDURE init (
         p_run_mode in VARCHAR2 DEFAULT 'ANALYZE',
         p_ip_address in VARCHAR2 DEFAULT NULL,
         p_incr_ts_dir in VARCHAR2 DEFAULT NULL,
@@ -30,7 +30,9 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
       Full details available at https://github.com/xsf3190/automigrate.git
 */
 
-    TTS_CHECK_FAILED EXCEPTION;
+    TTS_CHECK_FAILED EXCEPTION; 
+    
+    MIGRSCHEMA VARCHAR2(20):=SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
 
     -------------------------------
     PROCEDURE log(pLine IN VARCHAR2, pChar IN VARCHAR2 DEFAULT NULL) IS
@@ -70,7 +72,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         l_lang    NUMBER := 0;
         l_warning NUMBER;
     BEGIN
-        l_bfile:=bfilename('MIGRATION_SCRIPT_DIR',pFilename);
+        l_bfile:=bfilename(MIGRSCHEMA||'_SCRIPT_DIR',pFilename);
         dbms_lob.fileopen(l_bfile, dbms_lob.file_readonly);
         dbms_lob.loadclobfromfile(pClob, l_bfile, DBMS_LOB.lobmaxsize, d_offset,s_offset,l_csid, l_lang, l_warning);
         dbms_lob.fileclose(l_bfile);
@@ -88,7 +90,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         INSERT INTO migration_log (id, log_message) VALUES (migration_log_seq.nextval, empty_clob()) RETURN log_message INTO l_clob;
         fileToClob(pFilename,l_clob);
         COMMIT;
-        utl_file.fremove(location=>'MIGRATION_SCRIPT_DIR', filename=>pFilename);
+        utl_file.fremove(location=>MIGRSCHEMA||'_SCRIPT_DIR', filename=>pFilename);
     END;
 
     -------------------------------
@@ -261,7 +263,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         log('        CHARACTER SET : '||l_characterset);
         log('                 APEX : '||l_apex);
         log('             HOSTNAME : '||l_host_name);
-        log(' DBLINK FOR MIGRATION : '||'USER='||SYS_CONTEXT('USERENV','CURRENT_SCHEMA')
+        log(' DBLINK FOR MIGRATION : '||'USER='||MIGRSCHEMA
                                       ||' HOST='||pIpAddress
                                       ||' SERVICE='||COALESCE(l_oracle_pdb_sid,l_service_name));
         log('        PLATFORM NAME : '||l_platform);
@@ -344,6 +346,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
                     FROM dba_segments s, V_MIGRATION_USERS u
                    WHERE s.owner=u.username
                      AND u.oracle_maintained='N'
+                     AND u.username<>MIGRSCHEMA
                      AND s.tablespace_name in ('SYSTEM','SYSAUX')
                    ORDER BY s.segment_type, s.owner)
         LOOP
@@ -402,21 +405,6 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
     END;
 
     -------------------------------
-    PROCEDURE create_directory(p_incr_ts_dir in VARCHAR2 DEFAULT NULL) IS
-    /*
-     *  CREATE BACKUP DIRECTORY FOR INCREMENTAL BACKUP MIGRATION OR FOR EACH DISTINCT DATA FILE DIRECTORY.
-     */
-    BEGIN
-        IF (p_incr_ts_dir IS NOT NULL) THEN
-            exec('CREATE OR REPLACE DIRECTORY MIGRATION_FILES_1_DIR AS '''||p_incr_ts_dir||'''');
-        ELSE
-            FOR C IN (SELECT directory_name, ROWNUM rn FROM (SELECT DISTINCT directory_name FROM v_app_tablespaces)) LOOP
-                exec('CREATE OR REPLACE DIRECTORY MIGRATION_FILES_'||C.rn||'_DIR AS '''||C.directory_name||'''');
-            END LOOP;
-        END IF;
-    END;
-
-    -------------------------------
     PROCEDURE incr_job(pAction in VARCHAR2, p_incr_ts_freq in VARCHAR2) IS
     /*
      *  CREATE OR RUN INCREMENTAL BACKUP JOB
@@ -469,7 +457,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
             COMMIT;
         END;
     BEGIN
-        SELECT directory_path||'/' INTO l_dir_path FROM dba_directories WHERE directory_name='MIGRATION_FILES_1_DIR';
+        SELECT directory_path||'/' INTO l_dir_path FROM dba_directories WHERE directory_name=MIGRSCHEMA||'_FILES_1_DIR';
         --
         SELECT SYSDATE INTO l_started FROM dual;
         --
@@ -531,52 +519,12 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         END IF;
     END;
 
-    -------------------------------
-    PROCEDURE validate(p_run_mode in VARCHAR2, p_incr_ts_dir in VARCHAR2, p_running_incr IN BOOLEAN) IS
-        l_file_exists NUMBER;
-        l_error VARCHAR2(100);
-        n PLS_INTEGER;
-        TB2 CONSTANT integer :=2*POWER(1024,4);
-    BEGIN
-        /*
-         *  ABORT IF TABLESPACES ARE NOT KOSHER FOR MIGRATION
-         */
-        FOR C IN (SELECT file_name,bytes, ROW_NUMBER() OVER (PARTITION BY file_name ORDER BY file_name) rn FROM v_app_tablespaces)
-        LOOP
-            IF (C.bytes>TB2) THEN
-                RAISE_APPLICATION_ERROR(-20000,'SIZE OF FILE '||C.file_name||' EXCEEDS 2TB MAXIMUM ALLOWED FOR DBMS_FLE_TRANSFER.');
-            END IF;
-            IF (C.rn>1) THEN
-                RAISE_APPLICATION_ERROR(-20000,C.file_name||' - FILE NAME USED IN MORE THAN ONE DIRECTORY. ALL MIGRATED FILE NAMES MUST BE UNIQUE.');
-            END IF;
-        END LOOP;
-
-        /*
-         *  ABORT IF INCR_TS MIGRATION AND DIRECTORY EITHER NOT SPECIFIED OR NOT EXISTS
-         */
-        IF (p_run_mode='INCR') THEN
-            IF (p_running_incr) THEN
-                RAISE_APPLICATION_ERROR(-20000,'INCREMENTAL BACKUP PROCESS ALREADY RUNNING.');
-            END IF;
-            IF (p_incr_ts_dir IS NULL) THEN
-                RAISE_APPLICATION_ERROR(-20000,'MUST SPECIFY "BKPDIR" PARAMETER - LOCATION FOR FILE IMAGE COPIES AND INCREMENTAL BACKUPS');
-            ELSE
-                EXECUTE IMMEDIATE 'CREATE OR REPLACE DIRECTORY DELETEITLATER AS '''||p_incr_ts_dir||'''';
-                l_file_exists := DBMS_LOB.FILEEXISTS(BFILENAME('DELETEITLATER','.'));
-                EXECUTE IMMEDIATE 'DROP DIRECTORY DELETEITLATER';
-                IF ( l_file_exists<>1 ) THEN
-                    RAISE_APPLICATION_ERROR(-20000,p_incr_ts_dir||' - DIRECTORY DOES NOT EXIST ON '||SYS_CONTEXT('userenv','host'));
-                END IF;
-            END IF;
-        END IF;
-    END;
 
     -------------------------------
     PROCEDURE closing_remarks(p_ip_address in VARCHAR2, p_run_mode in VARCHAR2, p_running_incr IN BOOLEAN) IS
         l_db_name v$database.name%type;
         l_oracle_pdb_sid VARCHAR2(30);
         l_service_name v$services.name%type;
-        l_whoami VARCHAR2(30):=SYS_CONTEXT('USERENV','CURRENT_SCHEMA');
         l_command VARCHAR2(300);
         l_password VARCHAR2(12);
         n PLS_INTEGER;
@@ -592,17 +540,8 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         sys.dbms_system.get_env('ORACLE_PDB_SID',l_oracle_pdb_sid);
 
         SELECT log_message INTO l_password FROM migration_log WHERE id=1;
-        /*
-        l_command:='sqlplus  / as sysdba @tgt_migr'
-                        ||' HOST='||p_ip_address
-                        ||' SERVICE='||COALESCE(l_oracle_pdb_sid,l_service_name)
-                        ||' PDBNAME='||l_db_name
-                        ||' PW='||l_password;
-        IF (l_whoami<>'MIGRATION') THEN
-            l_command:=l_command||' USER='||l_whoami;
-        END IF;
-        */
-        l_command:='./runMigration.sh -u ' || l_whoami||'/'''||l_password || ''' -t ' || TRIM(p_ip_address) || ':1521' || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
+
+        l_command:='./runMigration.sh -c ' || MIGRSCHEMA||'/'''||l_password || ''' -t ' || TRIM(p_ip_address) || ':1521' || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
 
         log('ALL PREPARATION TASKS ON SOURCE DATABASE COMPLETED SUCCESSFULLY','-');
         log('');
@@ -611,7 +550,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
     END;
 
     --------------------------------------------------
-    PROCEDURE init_migration (p_run_mode in VARCHAR2, p_ip_address in VARCHAR2, p_incr_ts_dir in VARCHAR2, p_incr_ts_freq in VARCHAR2) IS
+    PROCEDURE init (p_run_mode in VARCHAR2, p_ip_address in VARCHAR2, p_incr_ts_dir in VARCHAR2, p_incr_ts_freq in VARCHAR2) IS
         l_check_tts_violations NUMBER;
         l_compatibility VARCHAR2(50);
         l_migration_method VARCHAR2(21);
@@ -626,8 +565,6 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         SELECT COUNT(*) INTO n FROM dual WHERE EXISTS (SELECT NULL FROM user_scheduler_jobs WHERE job_name='MIGRATION_INCR');
         l_running_incr:=(n=1);
 
-        validate(p_run_mode, p_incr_ts_dir, l_running_incr);
-
         CASE p_run_mode
             WHEN 'ANALYZE' THEN
                 check_tts_set;
@@ -637,12 +574,9 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
                 set_ts_readonly;
                 IF (l_running_incr) THEN
                     incr_job('RUN');
-                ELSE
-                    create_directory;
                 END IF;
             WHEN 'INCR' THEN
                 check_tts_set;
-                create_directory(p_incr_ts_dir);
                 incr_job('CREATE',p_incr_ts_freq);
                 incr_job('RUN');
         END CASE;
