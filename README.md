@@ -97,7 +97,7 @@ Logon to SOURCE server as "oracle" software owner or any account belonging to th
 
 Source the database to be migrated before running the migration script (i.e. ORACLE_HOME and ORACLE_SID)
 
-Run the migration script in "ANALYZE" mode to prepare the database for migration.
+Run the migration script in "ANALYZE" mode to report on relevant migration details, e.g. database size, version, server platform.
 
 ```
 ./runMigration.sh -m ANALYZE
