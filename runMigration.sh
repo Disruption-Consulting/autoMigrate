@@ -1,5 +1,72 @@
 #!/bin/bash
 
+zip /tmp/autoMigrate.zip  runMigration.sh pck_migration_src.sql pck_migration_tgt.sql pck_migration_rollforward.sql
+
+#################################################################################################################
+#
+#  SCRIPT      : runMigration.sh
+#
+#  DESCRIPTION : Migrates a NON-CDB Oracle database (SOURCE) to version 19 PDB (TARGET)
+#
+#  INSTALL     : Install this script and relevant package source files in a temporary directory
+#
+#
+#  SOURCE DATABASE
+#                       
+#                ./runMigration -m [ANALYZE|EXECUTE|INCR] -b [BKPDIR] -f [BKPFREQ] -r -u [USER]
+#
+#                -m ANALYZE
+#                     reports on database properties that are relevant to migration (e.g. size, version)
+#                   EXECUTE
+#                     prepares database for migration setting application tablespaces read only
+#                   INCR
+#                     prepares database for migration through rolling forward incremental backups
+#
+#                -b BKPDIR
+#                     for INCR specifies location of backup directory
+#
+#                -f BKPFREQ
+#                     for INCR specifies backup frequency. Default is hourly.
+#
+#                -r removes the schema created to manage the migration and any incremental backups
+#
+#                -u USER
+#                     required only if pre-migration database happens to have a user called "MIGRATION19"
+#
+#                OUTPUT
+#                  log file "runMigration.log" including the command to be run on the TARGET database if -m [EXECUTE|INCR]
+#                   
+#
+#  TARGET DATABASE
+#                       
+#                ./runMigration -c [CREDENTIAL] -t [TNS] -p [PDB} -r
+#
+#                -c CREDENTIAL
+#                     credentials of migration schema created on SOURCE database.
+#
+#                -t TNS
+#                     TNS string defining location of source database
+#
+#                -p PDB
+#                     Name of the PDB to be created for the migration. Typically the SOURCE database name.
+#
+#                -r removes PDB
+#
+#                OUTPUT
+#                  log file "runMigration.log" of tasks performed to create the target PDB
+#                  for each PDB creates a log file "runMigration.PDB.log" of transfer / datapump / final tasks
+#
+#
+#  SECURITY
+#                The credentials of all schemas created by the script are added to an external Oracle password wallet
+#                created in the installation directory
+#
+#                Passwords are complex, randomly generated 10 character strings comprising upper/lower and special characters
+#
+#                Log files are loaded into the TARGET PDB and deleted from the OS file system when migration is completed
+#
+#################################################################################################################
+
 SCRIPT=$(basename $0); FN="${SCRIPT%.*}"; LOGFILE=${FN}.log; SQLFILE=${FN}.sql; CD=$(pwd)
 
 exec > >(tee ${LOGFILE}) 2>&1
@@ -48,7 +115,7 @@ runsql() {
     
     while getopts "c:s:v" o; do
         case "${o}" in
-            c) CONNECT="CONNECT ${OPTARG}" ;;
+            c) CONNECT="CONNECT /@${OPTARG}" ;;
             s) SQL=${OPTARG} ;;
             v) RETVAL=TRUE ;;
         esac
@@ -132,22 +199,24 @@ deleteCredential() {
     
     mkstore -wrl "${WALLET}" -deleteCredential "${TNS}"<<EOF
 ${WPW}
-EOF    
+EOF
 
-    sed -i '/^${TNS}/d' ${TNSNAMES}
+    sed -i "/^${TNS}/d" ${TNSNAMES}
 }
 
 
 removeSource() {
     log "removeSource"
     
+    deleteCredential "${USER}"
+    
     cat <<-EOF>${SQLFILE}
         CONNECT / AS SYSDBA
+        WHENEVER SQLERROR EXIT FAILURE
         SET SERVEROUTPUT ON
-        WHENEVER SQLERROR CONTINUE
+        SET ECHO ON
         EXEC ${USER}.pck_migration_src.set_ts_readwrite
         DROP USER ${USER} CASCADE;
-        WHENEVER SQLERROR EXIT FAILURE
         DECLARE
             PROCEDURE exec(pCommand IN VARCHAR2) IS
             BEGIN
@@ -159,7 +228,7 @@ removeSource() {
                     RAISE;
             END;
         BEGIN
-            FOR C IN (SELECT directory_name FROM dba_directories WHERE REGEXP_LIKE(directory_name,'MIGRATION_FILES_[1-9]+_DIR')) LOOP
+            FOR C IN (SELECT directory_name FROM dba_directories WHERE REGEXP_LIKE(directory_name,'${USER}_FILES_[1-9]+_DIR')) LOOP
                 exec('DROP DIRECTORY '||C.directory_name);
             END LOOP;
         END;
@@ -174,12 +243,7 @@ EOF
         DELETE NOPROMPT BACKUP TAG='INCR-TS';
         EXIT
 EOF
-    rman cmdfile="${RMANFILE}" || { echo "RMAN DELETE BACKUPS FAILED"; exit 1; }
-    
-    if [ -d "${WALLET}" ]; then
-        log "mv ${WALLET} .. in preference to rm"
-        mv "${WALLET}" "${WALLET}_TOBEDELETED"
-    fi
+    rman cmdfile="${RMANFILE}" || { echo "RMAN DELETE INCREMENTAL MIGRATION BACKUPS FAILED"; exit 1; }
 }
 
 
@@ -195,33 +259,57 @@ createSourceSchema(){
 
     cat <<-EOF>${SQLFILE}
         CONNECT / AS SYSDBA
+        SET SERVEROUTPUT ON
         CREATE USER ${USER} IDENTIFIED BY ${PW} DEFAULT TABLESPACE SYSTEM QUOTA 10M ON SYSTEM;
         GRANT SELECT ANY DICTIONARY,
               CREATE SESSION,
               ALTER TABLESPACE,
-              CREATE ANY DIRECTORY,
-              DROP ANY DIRECTORY,
               CREATE ANY JOB,
               MANAGE SCHEDULER,
               ${PRIV} TO ${USER};
         GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO ${USER};
         GRANT EXECUTE ON SYS.DBMS_SYSTEM TO ${USER};
         GRANT EXECUTE ON SYS.DBMS_CRYPTO TO ${USER};
-        
+        DECLARE
+            PROCEDURE exec(pCommand IN VARCHAR2) IS
+            BEGIN
+                dbms_output.put(pCommand);
+                EXECUTE IMMEDIATE pCommand;
+                dbms_output.put_line(' ..OK');
+                EXCEPTION WHEN OTHERS THEN
+                    dbms_output.put_line(' ..FAILED');
+                    RAISE;
+            END;            
+        BEGIN
+            FOR C IN (SELECT directory_name, ROWNUM rn FROM 
+                        ( SELECT DISTINCT SUBSTR(f.file_name,1,INSTR(f.file_name,'/',-1)-1) directory_name
+                            FROM dba_tablespaces t, dba_data_files f
+                           WHERE t.tablespace_name=f.tablespace_name
+                             AND t.contents='PERMANENT'
+                             AND t.tablespace_name NOT IN ('SYSTEM','SYSAUX')
+                        )
+            ) LOOP
+                exec('CREATE OR REPLACE DIRECTORY ${USER}_FILES_'||C.rn||'_DIR AS '''||C.directory_name||'''');
+                exec('GRANT READ, WRITE ON DIRECTORY ${USER}_FILES_'||C.rn||'_DIR TO ${USER}');
+            END LOOP;
+        END;
+        /
+        CREATE OR REPLACE DIRECTORY ${USER}_SCRIPT_DIR AS '${CD}';
+        GRANT READ, WRITE ON DIRECTORY ${USER}_SCRIPT_DIR TO ${USER};
         ALTER SESSION SET CURRENT_SCHEMA=${USER};
         CREATE OR REPLACE VIEW V_APP_TABLESPACES AS
           SELECT t.tablespace_name, t.status, t.file_id, d.directory_path, d.directory_name, SUBSTR(t.file_name,pos+1) file_name, t.enabled, t.bytes
           FROM
             (
              SELECT t.tablespace_name, t.status, f.file_id, f.file_name,INSTR(f.file_name,'/',-1) pos, f.bytes, v.enabled
-               FROM dba_tablespaces t, dba_data_files f, v$datafile v
+               FROM dba_tablespaces t, dba_data_files f, v\$datafile v
               WHERE t.tablespace_name=f.tablespace_name
                 AND v.file#=f.file_id
                 AND t.contents='PERMANENT'
                 AND t.tablespace_name NOT IN ('SYSTEM','SYSAUX')
             ) t, all_directories d
             WHERE SUBSTR(t.file_name,1,pos-1)=d.directory_path
-            AND d.directory_name LIKE 'MIGRATION_FILES%';
+            AND d.directory_name LIKE '${USER}_FILES%';
             
         CREATE TABLE migration_ts(
                     file# NUMBER,
@@ -268,8 +356,7 @@ EOF
                  USING(username)
               )
               SELECT username, DECODE(COALESCE(no_expdp,no_sby,no_hc),NULL,'N','Y') oracle_maintained
-              FROM u
-              WHERE username<>'${USER}';
+              FROM u;
 EOF
     else
         cat <<-EOF>>${SQLFILE}
@@ -293,6 +380,7 @@ EOF
     runsql || { echo "createSourceSchema FAILED"; exit 1; }
     
     local SERVICE=$(runsql -v -s "SELECT ${USER}.pck_migration_src.getdefaultservicename FROM dual;")
+    chkerr "$?" "${LINENO}" "${SERVICE}"
     
     createCredential "${USER}" "${USER}" "${PW}" "${SERVICE}" 
 }
@@ -307,7 +395,7 @@ runSourceMigration() {
     SET SERVEROUTPUT ON
     SET LINESIZE 300
     BEGIN
-        pck_migration_src.init_migration(
+        pck_migration_src.init(
             p_ip_address=>'${IP}',
             p_run_mode=>'${MODE}', 
             p_incr_ts_dir=>'${BKPDIR}', 
@@ -321,25 +409,86 @@ EOF
 
 processSource() {
     log "processSource"
-    local MSG=
-    [[ ! "${MODE}" =~ (^ANALYZE|EXECUTE|INCR$) ]] && MSG="-m <MODE> MUST BE ONE OF [ANALYZE|EXECUTE|INCR]. DEFAULT IS ANALYZE."
-    [[ "${MODE}" = "INCR"  &&  -z "${BKPDIR}" ]] && MSG="-b <BKPDIR> MUST BE SPECIFIED FOR -m INCR"
-    [[ "${MODE}" != "INCR"  &&  (-n "${BKPDIR}" || -n "${BKPFREQ}") ]] && MSG="-b <BKPDIR> AND -f <BKPFREQ> ONLY RELEVANT FOR -m INCR"
     
-    if [ -n "${MSG}" ]; then
-        echo "${MSG}"
-        exit 1
-    fi
+    local V10103=$(version "10.1.0.3")
     
-    if [ "${REMOVE}" = "TRUE" ]; then
-        removeSource
-        exit 0
-    fi
+    [[ "${MODE}" =~ (^ANALYZE|EXECUTE|INCR$) ]] || { echo "-m <MODE> MUST BE ONE OF [ANALYZE|EXECUTE|INCR]. DEFAULT IS ANALYZE."; exit 1; }
+    [[ "${MODE}" = "INCR"  &&  -z "${BKPDIR}" ]] && { echo "-b <BKPDIR> MUST BE SPECIFIED FOR -m INCR"; exit 1; }
+    [[ "${MODE}" != "INCR"  &&  (-n "${BKPDIR}" || -n "${BKPFREQ}") ]] && { echo "-b <BKPDIR> AND -f <BKPFREQ> ONLY RELEVANT FOR -m INCR"; exit 1; }
+    [[ "${THISDB}" < "${V10103}" ]] && { echo "LOWEST VERSION WE CAN MIGRATE IS 10.1.0.3"; exit 1; }
+    
+    cat <<-EOF>${SQLFILE}
+    CONNECT / AS SYSDBA
+    SET SERVEROUTPUT ON
+    SET ECHO OFF
+    DECLARE
+        n PLS_INTEGER;
+        l_compatibility VARCHAR2(10);
+        l_cdb VARCHAR2(3);
+        l_oracle_pdb_sid VARCHAR2(20);
+    BEGIN
+        n:=0;
+        FOR C IN (SELECT DISTINCT file_name,nb,GT2TB FROM 
+                    (SELECT file_name,COUNT(*) OVER (PARTITION BY file_name) nb, CASE WHEN bytes>2*POWER(1024,4) THEN 1 ELSE 0 END GT2TB
+                       FROM(
+                          SELECT SUBSTR(f.file_name,INSTR(f.file_name,'/',-1)+1) file_name, bytes
+                            FROM dba_tablespaces t, dba_data_files f
+                           WHERE t.tablespace_name=f.tablespace_name
+                             AND t.contents='PERMANENT'
+                             AND t.tablespace_name NOT IN ('SYSTEM','SYSAUX')
+                        )
+                 ) ) 
+        LOOP
+            IF (C.nb>1) THEN
+                n:=n+1;
+                dbms_output.put_line(C.file_name||' IN MULTIPLE DIRECTORIES. MUST BE RENAMED TO BE UNIQUE WITHIN DATABASE.');
+            END IF;
+            IF (C.GT2TB>0) THEN
+                n:=n+1;
+                dbms_output.put_line(C.file_name||' EXCEEDS MAXIMUM SIZE ALLLOWED 2TB.');
+            END IF;
+        END LOOP;
+        
+        SELECT value INTO l_compatibility FROM v\$parameter WHERE name='compatible';
+        IF (l_compatibility LIKE '9%') THEN
+            n:=n+1;
+            dbms_output.put_line('MINIMUM COMPATIBILITY IS 10.0.0 - USE ALTER SYSTEM TO CHANGE, RESTART DATABASE AND RETRY.');
+        END IF;
+        
+        IF ('${MODE}'='INCR') THEN
+            FOR C IN (SELECT NULL FROM v\$database WHERE log_mode<>'ARCHIVELOG') LOOP
+                n:=n+1;
+                dbms_output.put_line('MUST BE ARCHIVELOG MODE TO MIGRATE USING INCREMENTAL BACKUPS.');
+            END LOOP;
+        END IF;                
+        
+        l_cdb:='NO';
+        IF ('${VERSION}' LIKE '12%') THEN
+            EXECUTE IMMEDIATE 'SELECT cdb FROM v\$database' INTO l_cdb;
+        END IF;
+        IF (l_cdb='YES') THEN
+            sys.dbms_system.get_env('ORACLE_PDB_SID',l_oracle_pdb_sid);
+            IF (l_oracle_pdb_sid IS NULL) THEN
+                n:=n+1;
+                dbms_output.put_line('SET ORACLE ENVIRONMENT VARIABLE "ORACLE_PDB_SID" TO MIGRATE PDB WITH THIS UTILITY.');
+            END IF;
+        END IF;        
+        
+        IF (n>0) THEN
+            RAISE_APPLICATION_ERROR(-20000,n||' QUALIFICATION ERROR(S) OCCURED');
+        END IF;
+    END;
+    /
+EOF
+    runsql || { echo "DATABASE DOES NOT QUALIFY FOR MIGRATION WITH THIS UTILITY"; exit 1; }    
+    
+    
+    [[ "${REMOVE}" = "TRUE" ]] && { removeSource; exit 0; }
     
     local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM dba_users WHERE username='${USER}');")
     chkerr "$?" "${LINENO}" "${EXISTS}"
     
-    [[ "${EXISTS}" = "0" ]] && createSourceSchema || runSourceMigration
+    [[ "${EXISTS}" = "0" ]] && { createSourceSchema; runSourceMigration; } || runSourceMigration
 }
 
 
@@ -390,13 +539,11 @@ EOF
 removeTarget() {
     log "removeTarget"
     
-    local FILEPATH=$(runsql -v -s "SELECT DISTINCT SUBSTR(f.file_name,1,INSTR(f.file_name,'/',-1)) FROM cdb_data_files f, v\$pdbs p WHERE f.con_id=p.con_id AND p.name='${PDB}';");
+    local FILEPATH=$(runsql -v -c "${ORACLE_SID}" -s "SELECT DISTINCT SUBSTR(f.file_name,1,INSTR(f.file_name,'/',-1)) FROM cdb_data_files f, v\$pdbs p WHERE f.con_id=p.con_id AND p.name='${PDB}';");
     chkerr "$?" "${LINENO}" "${FILEPATH}"
     
     cat <<-EOF>${SQLFILE}
-        CONNECT /@${ORACLE_SID}
-        COL filepath NEW_VALUE filepath noprint;
-        SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1))) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
+        CONNECT /@${ORACLE_SID} AS SYSDBA
         WHENEVER SQLERROR CONTINUE
         ALTER PLUGGABLE DATABASE ${PDB} CLOSE IMMEDIATE;
         WHENEVER SQLERROR EXIT FAILURE
@@ -406,7 +553,7 @@ EOF
     
     deleteCredential "${PDB}"
     
-    echo "rm -v ${FILEPATH}/*"
+    [[ -z ${FILEPATH} ]] || rm -i -v ${FILEPATH}*
 }
 
 
@@ -446,6 +593,7 @@ createTargetSchema() {
         GRANT CREATE TABLESPACE TO PDBADMIN;
         GRANT DROP ANY DIRECTORY TO PDBADMIN;
         GRANT DROP TABLESPACE TO PDBADMIN;
+        GRANT DROP USER TO PDBADMIN;
         GRANT MANAGE SCHEDULER TO PDBADMIN;
         GRANT SELECT ANY DICTIONARY TO PDBADMIN;
         GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO PDBADMIN;
@@ -457,7 +605,7 @@ createTargetSchema() {
         COL con_id NEW_VALUE con_id noprint;
         COL filepath NEW_VALUE filepath noprint;
         SELECT SYS_CONTEXT('USERENV','CON_ID') AS con_id FROM dual;
-        SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1))) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
+        SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1)-1)) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
         CREATE OR REPLACE DIRECTORY TGT_FILES_DIR AS '&filepath';
         GRANT READ, WRITE ON DIRECTORY TGT_FILES_DIR TO PDBADMIN;
         CREATE TABLE PDBADMIN.migration_ts
@@ -536,16 +684,17 @@ createTargetRunScripts() {
     
     cat <<-EOF>${RUNSCRIPT}.sql
         whenever sqlerror exit failure
+        set echo on
         connect /@${PDB}
             exec pck_migration_tgt.transfer
             col all_ts_readonly new_value all_ts_readonly noprint
             SELECT TO_CHAR(COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0))) all_ts_readonly FROM migration_ts;
         connect /@${ORACLE_SID}
             exec pck_migration_rollforward.apply
-        connect /@PDB1
+        connect /@${PDB}
             begin
                 if ('&all_ts_readonly'='0') then
-                    pck_migration_tgt.impdp;
+                    pck_migration_tgt.impdp(pOverride=>${OVERRIDE},pDbmsStats=>${DBMSSTATS});
                 end if;
             end;
             /
@@ -561,9 +710,12 @@ export ORACLE_HOME=${ORACLE_HOME}
 export ORACLE_SID=${ORACLE_SID}
 export PATH=\${ORACLE_HOME}/bin:${PATH}
 export TNS_ADMIN=${CD}
+
 sqlplus /nolog @${RUNSCRIPT}.sql
+[[ \$? = 0 ]] && { echo "Completed transfer successfully. Now starting datapump"; } || { echo "FAILED TO RUN ${RUNSCRIPT}.sql"; exit 1; }
+
 . ${RUNSCRIPT}.impdp.sh
-. ${RUNSCRIPT}.final.sh
+
 exit 0
 EOF
     chmod u+x ${RUNSCRIPT}.sh    
@@ -601,22 +753,16 @@ EOF
 processTarget() {
     log "processTarget"
     
-    local MSG=
-    [[ -z "${CRED}" ]] && MSG="-u <CRED> USER CREDENTIALS OF SOURCE MIGRATION SCHEMA MANDATORY."
-    [[ -z "${TNS}" ]] && MSG="-t <TNS> TNS DETAILS OF SOURCE MIGRATION DATABASE MANDATORY."
-    [[ -z "${PDB}" ]] && MSG="-p <PDB> NAME OF TARGET PDB IS MANDATORY."
-    
-    if [ -n "${MSG}" ]; then
-        echo "${MSG}"
-        exit 1
-    fi
-    
-    [[ "${REMOVE}" = "TRUE" ]] && { removeTarget; exit 0; }
-    
     local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM cdb_pdbs WHERE pdb_name='${PDB}');")
     chkerr "$?" "${LINENO}" "${EXISTS}"
     
-    [[ "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; } || runTargetMigration    
+    [[ "${REMOVE}" = "FALSE"  && (-z "${CRED}" || -z "${TNS}" || -z "${PDB}") ]] && { echo "-c <CRED> -t <TNS> -p <PDB> ALL MANDATORY."; exit 1; }
+    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "1" ]] && { log "RESTARTING MIGRATION"; runTargetMigration; }
+    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; }
+    
+    [[ "${REMOVE}" = "TRUE"  &&  (-n "${CRED}" || -n "${TNS}") ]] && { echo "-p <PDB> -r   MUST BE THE ONLY PARAMETERS SPECIFIED."; exit 1; }
+    [[ "${REMOVE}" = "TRUE"  &&  "${EXISTS}" = "0" ]] && { echo "PDB DOES NOT EXIST."; exit 1; }
+    [[ "${REMOVE}" = "TRUE" ]] && { removeTarget; }
 }
 
 
@@ -633,21 +779,21 @@ THISDB=$(version "${VERSION}")
 [[ ${VERSION} = 19* ]] && DB=TARGET || DB=SOURCE
 
 export TNS_ADMIN="${CD}"
+
 WALLET="${TNS_ADMIN}/wallet"
 TNSNAMES="${TNS_ADMIN}/tnsnames.ora"
 SQLNET="${TNS_ADMIN}/sqlnet.ora"
 
-[[ ! -f "${TNSNAMES}" ]] && cat /dev/null>"${TNSNAMES}"
-[[ ! -f "${SQLNET}" ]] && cat /dev/null>"${SQLNET}"
-
+[[ -f "${TNSNAMES}" ]] || cat /dev/null>"${TNSNAMES}"
+[[ -f "${SQLNET}" ]] || cat /dev/null>"${SQLNET}"
 
 
 case "${DB}" in
     SOURCE)
         MODE=ANALYZE
-        USER=MIGRATION
+        USER=MIGRATION19
         REMOVE=FALSE
-        while getopts "m:u:b:f:r" o; do
+        while getopts ":m:u:b:f:rh" o; do
             case "${o}" in
                 m) MODE=$(upper ${OPTARG}) ;;
                 u) USER=${OPTARG} ;;
@@ -663,15 +809,20 @@ case "${DB}" in
         done
         processSource
         ;;
+        
     TARGET)
         USER=C##MIGRATION
+        DBMSSTATS=TRUE
+        OVERRIDE=FALSE
         REMOVE=FALSE
-        while getopts ":c:t:p:rh" o; do
+        while getopts ":c:t:p:rh12" o; do
             case "${o}" in
                 c)  CRED=${OPTARG} ;;
                 t)  TNS=${OPTARG} ;;
                 p)  PDB=$(upper ${OPTARG}) ;;
                 r)  REMOVE=TRUE ;;
+                1)  DBMSSTATS=FALSE ;;
+                2)  OVERRIDE=TRUE ;;
                 h)  usageTarget ;;
                 :)  echo "ERROR -${OPTARG} REQUIRES  ARGUMENT"
                     usageTarget
@@ -683,4 +834,4 @@ case "${DB}" in
         ;;
 esac
 
-exit
+exit 0
