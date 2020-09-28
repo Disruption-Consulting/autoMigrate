@@ -87,123 +87,47 @@ N.b. the 10.1.0.3 limitation applies only to cross-platform migrations. Where so
 # AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" within this repository.
 
-Scripts "src_migr.sql" and "pck_migration_src.sql" should be extracted to a suitable filesystem on the source server, e.g. "/tmp".
+The same script "runMigration.sh" runs on both both SOURCE and TARGET database servers. 
 
-Scripts "tgt_migr.sql" and "pck_migration_tgt.sql" should be extracted to a suitable filesystem on the target server, e.g. "/tmp".
+When it runs on database server where ORACLE_SID points to version 19 then it processes as a TARGET database; otherwise it processes as a SOURCE database.
 
+## START MIGRATION ON SOURCE
 
-## START MIGRATION  
+Logon to SOURCE server as "oracle" software owner or any account belonging to the "dba" group.
 
-Logon to source server as "oracle" software owner or any account belonging to the "dba" group.
+Source the database to be migrated before running the migration script (i.e. ORACLE_HOME and ORACLE_SID)
 
-Source the database to be migrated before running the migration script. 
-
-For all examples in this project we are migrating a database with SID "AIXDB" on AIX server to LINUX:
-              
-```
-export ORACLE_SID=AIXDB
-export ORAENV_ASK=NO
-. oraenv
-```
-
-Run the migration script "src_migr.sql" in "analyze" mode to generate a screen report with relevant details of the database to be migrated. 
+Run the migration script in "ANALYZE" mode to prepare the database for migration.
 
 ```
-sqlplus / as sysdba @src_migr.sql mode=ANALYZE
+./runMigration.sh -m ANALYZE
 ```
 
-Run the migration script in "execute" mode to prepare the database for migration.
+- installs the migration schema (default name is MIGRATION19)
+- analyzes the subject database reporting on details relevant to the migration
 
 ```
-sqlplus / as sysdba @src_migr.sql mode=EXECUTE
+./runMigration.sh -m EXECUTE
 ```
 
-After a short period (depends on size of database) the script will generate on screen details of how to complete the migration on the target LINUX server.
+- sets all application tablespaces to read only
+- display the command to run on the TARGET server which will complete the migration
 
-## COMPLETE MIGRATION
+
+## COMPLETE MIGRATION ON TARGET
 
 Logon to target server as "oracle" software owner or any account belonging to the "dba" OS group.
 
-Source the pre-created target CDB. For example, assume that CDB called CDBDEV has been created:
+Source the pre-created target CDB, i.e. setting ORACLE_HOME and ORACLE_SID.
+
+Copy/paste the command displayed after running the script on the SOURCE server, e.g.
 
 ```
-export ORACLE_SID=CDBDEV
-export ORAENV_ASK=NO
-. oraenv
+./runMigration.sh -c MIGRATION19/'"hmN_a1a0~Y"' -t 172.17.0.3:1521/orcl -p PDB1
 ```
 
-Run the "tgt_migr.sql" script as indicated in the output from running "src_migr.sql" on the source server:
-
-```
-sqlplus / as sysdba @tgt_migr.sql \
-    HOST=10.1.23.124 \     # IP address of AIX source server 
-    SERVICE=WMLDEV \       # listening service name on AIX server. Usually same as SID name
-    PDBNAME=WMLDEV \       # name of target PDB to be created. Should default this to the SID of AIX source database
-    PW=FLIUTjkXX!          # password of MIGRATION schema on source database that was created by running "src_migr.sql"
-```
-
-The migration is started in the background and can be monitored either by viewing contents of log file "/tmp/migration.log" (default location) or by running this query in a tool like "sqlplus" or "sqlDeveloper":
-
-```
-ALTER SESSION SET CONTAINER=WMLDEV;
-SELECT * FROM migration.log ORDER BY id;
-```
-
-
-## SCRIPT COMMAND PARAMETERS   
-
-Parameters in *`italics`* are optional.
-
-### src_migr.sql
-
-`MODE=[ANALYZE|EXECUTE|INCR-TS|INCR-TS-FINAL|RESET|REMOVE]`
-- `ANALYZE` - show details about the database - e.g. name and size of database (DEFAULT)
-  
-- `EXECUTE` - prepares database for direct migration - i.e. sets all application tablespaces to read only
-
-- `INCR` - starts migration by taking incremental backups in a background job. Tablespaces remain online
-  
-- `RESET` - sets tablespaces back to their pre-migration status
-
-- `REMOVE` - remove all database objects and any backups created for the migration
-                           
-*`BKPDIR`*
->directory to store file image copies and incremental backups - mandatory parameter if `MODE=INCR`
-  
-*`BKPFREQ`*
->frequency for taking incremental backups - default is on the hour every hour - only relevant for `MODE=INCR-TS` Same syntax as used for dbms_scheduler repeat_interval, e.g. *`BKPFREQ='freq=daily; byhour=6; byminute=0; bysecond=0;'`* is every day at 6AM.
-
-*`USER`*
->Name of transfer user. Default is MIGRATION. Ony change this if "MIGRATION" happens to exist pre-migration.
-
-### tgt_migr.sql
-
-`USER`   
->Name of source database user referenced in database link. Default is MIGRATION.
-
-`HOST`
->IP Address of the server hosting the source database.
-
-`SERVICE`
->Name of the source database's listening service running in the source environment.
-
-`PORT`
->Port on which service is registered with the listener. Default is 1521.
-
-`PDBNAME`
->Name of the Pluggable database (PDB) to be created in the CDB. 
-
-*`OPTIONS=[TTS,NOSTATS]`*
-- *`NOSTATS`* - Does **not** gather statistics after migration. 
-- *`TTS`* - forces migration by TRANSPORTABLE TABLESPACE. *** FOR TESTING ONLY ***
-
-*`MODE=[REMOVE]`*
-- *`REMOVE`* - drops the PDB identified by PDBNAME parameter. Use this prior to a complete database refresh for example.
-
-# APPENDIX
-
-## REFERENCES
-
-https://www.oracle.com/a/tech/docs/twp-upgrade-oracle-database-19c.pdf
-
-https://www.oracle.com/technetwork/database/features/availability/maa-wp-11g-upgradetts-132620.pdf
+- creates the target PDB 
+- creates PDBADMIN schema within PDB 
+- creates dblink using above details within the PDB
+- transfers data files from SOURCE to TARGET
+- runs DATAPUMP to integrate the data files, copy metadata and perform post-migration tasks.
