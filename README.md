@@ -41,8 +41,8 @@ A key advantage of autoMigrate is fully integrated functionality to migrate larg
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:no_entry:|5 mins|`sqlplus @src_migr mode=EXECUTE`||
-|:no_entry:|||`sqlplus @tgt_migr`|
+|:no_entry:|5 mins|`./runMigration -m EXECUTE`||
+|:no_entry:|||`./runMigration -c CRED -t TNS -p PDB`|
 |:no_entry:|5 mins||**CREATE PDB**|
 |:no_entry:|11 hours||**TRANSFER DATA**|
 |:no_entry:|50 mins||**RUN DATAPUMP**|
