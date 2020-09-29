@@ -3,20 +3,19 @@ Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minima
 
 - uses functionality exclusively included in the basic software license
 - reduces application downtime to a minimum
-- tested on source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
-- tested on target database versions 19.3 through 19.8 (CDB)
+- supported source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
+- target database versions 19.3 through 19.8 (CDB)
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. 
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs leading to a considerable reduction in the cost of ownership.
 
 # OVERVIEW
 
 Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
 
 - version 19 has the longest support timeframe
-- legacy databases are fast reaching end-of-life incurring extra support costs
+- legacy databases are fast reaching end-of-life incurring significant extra support costs
 - NON-CDB is deprecated as of version 20
-- each version 19 CDB may comprise 3 PDBs at no additional cost
-- adoption of CDB can significantly lower the cost of ownership
+- each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
 
 Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs 735 PDBs consolidated within 5 CDBs. In addition, test and development databases which are mostly unused can now be consolidated into a single CDB and hosted on cheap infrastructure, considerably reducing software licensing costs. CDB also enables database self-provisioning, drastically reducing project timescales; likewise, creating database copies for tests is now a 5 minute PDB clone operation. Being able to backup and upgrade a single CDB infers saving the cost of duplicating these costly tasks for each of the contained PDBs.  The same Mobiliar company managed to upgrade all of its 735 PDBs from version 12.2 to 19 over a single weekend, an impossible undertaking for 735 NON-CDBs.
@@ -27,7 +26,7 @@ Many organizations that have moved from NON-CDB to CDB have seen massive benefit
 
 The "autoMigrate" utility provides a framework for coordinating the large number of tasks involved in database migration, including:
 
-- transporting application data from source to target as an easily restartable process in the event of network or systems failure
+- data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
 - copying metadata definitions from source to target 
 - reconciling transferred data and metadata
