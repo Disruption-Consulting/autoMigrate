@@ -2,7 +2,6 @@ CREATE OR REPLACE PACKAGE pck_migration_src AS
     --
     PROCEDURE init (
         p_run_mode in VARCHAR2 DEFAULT 'ANALYZE',
-        p_ip_address in VARCHAR2 DEFAULT NULL,
         p_incr_ts_dir in VARCHAR2 DEFAULT NULL,
         p_incr_ts_freq in VARCHAR2 DEFAULT NULL);
     --
@@ -140,7 +139,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
     END;
 
     -------------------------------
-    PROCEDURE log_details(pRunMode IN VARCHAR2, pVersion IN VARCHAR2, pCompatibility IN VARCHAR2, pIpAddress IN VARCHAR2, p_running_incr BOOLEAN) IS
+    PROCEDURE log_details(pRunMode IN VARCHAR2, pVersion IN VARCHAR2, pCompatibility IN VARCHAR2, p_running_incr BOOLEAN) IS
         l_apex varchar2(100);
         l_bct_status v$block_change_tracking.status%type;
         l_characterset varchar2(20);
@@ -149,6 +148,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         l_hash_runmigration varchar2(40);
         l_hash_pck_migration_src varchar2(40);
         l_host_name v$instance.host_name%type;
+        l_ip_address varchar2(20);
         l_log_mode v$database.log_mode%type;
         l_migration_method VARCHAR2(21);
         l_migration_explained VARCHAR2(200);
@@ -247,6 +247,8 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
                 l_apex:='APEX APPLICATIONS MUST BE EXPORTED/IMPORTED INTO TARGET PDB, WHICH NEEDS MINIMUM APEX INSTALLATION VERSION 18.2';
             END IF;
         END LOOP;
+        
+        SELECT log_message INTO l_ip_address FROM migration_log WHERE name='IP';
 
         log('             DATABASE MIGRATION','-');
         log('             RUN MODE : '||pRunMode);
@@ -264,7 +266,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         log('                 APEX : '||l_apex);
         log('             HOSTNAME : '||l_host_name);
         log(' DBLINK FOR MIGRATION : '||'USER='||MIGRSCHEMA
-                                      ||' HOST='||pIpAddress
+                                      ||' HOST='||l_ip_address
                                       ||' SERVICE='||COALESCE(l_oracle_pdb_sid,l_service_name));
         log('        PLATFORM NAME : '||l_platform);
         log('        DATABASE SIZE : '||LTRIM(TO_CHAR(ROUND(l_total_bytes/1024/1024/1024,2),'999,999,990.00')|| ' GB'));
@@ -521,12 +523,14 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
 
 
     -------------------------------
-    PROCEDURE closing_remarks(p_ip_address in VARCHAR2, p_run_mode in VARCHAR2, p_running_incr IN BOOLEAN) IS
+    PROCEDURE closing_remarks(p_run_mode in VARCHAR2, p_running_incr IN BOOLEAN) IS
         l_db_name v$database.name%type;
         l_oracle_pdb_sid VARCHAR2(30);
         l_service_name v$services.name%type;
         l_command VARCHAR2(300);
         l_password VARCHAR2(12);
+        l_ip_address VARCHAR2(20);
+        l_port VARCHAR2(5):='1521';
         n PLS_INTEGER;
     BEGIN
         IF (p_run_mode='EXECUTE' AND p_running_incr) THEN
@@ -539,9 +543,14 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         l_db_name:=CASE WHEN n>0 THEN SUBSTR(l_service_name,1,n-1) ELSE l_service_name END;
         sys.dbms_system.get_env('ORACLE_PDB_SID',l_oracle_pdb_sid);
 
-        SELECT log_message INTO l_password FROM migration_log WHERE id=1;
+        SELECT log_message INTO l_password FROM migration_log WHERE name='PW';
+        SELECT log_message INTO l_ip_address FROM migration_log WHERE name='IP';
+                        
+        FOR C IN (SELECT NULL FROM dba_objects where owner='PUBLIC' AND object_name='V$LISTENER_NETWORK') LOOP
+            EXECUTE IMMEDIATE q'{SELECT REGEXP_SUBSTR(value,'PORT=(\d+)',1,1,'i',1) FROM v$listener_network WHERE type='LOCAL LISTENER'}' INTO l_port;
+        END LOOP;
 
-        l_command:='./runMigration.sh -c ' || MIGRSCHEMA||'/'''||l_password || ''' -t ' || TRIM(p_ip_address) || ':1521' || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
+        l_command:='./runMigration.sh -c ' || MIGRSCHEMA||'/'''||l_password || ''' -t ' || l_ip_address || l_port || '/' || COALESCE(l_oracle_pdb_sid,l_service_name) || ' -p ' || l_db_name;
 
         log('ALL PREPARATION TASKS ON SOURCE DATABASE COMPLETED SUCCESSFULLY','-');
         log('');
@@ -550,7 +559,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
     END;
 
     --------------------------------------------------
-    PROCEDURE init (p_run_mode in VARCHAR2, p_ip_address in VARCHAR2, p_incr_ts_dir in VARCHAR2, p_incr_ts_freq in VARCHAR2) IS
+    PROCEDURE init (p_run_mode in VARCHAR2, p_incr_ts_dir in VARCHAR2, p_incr_ts_freq in VARCHAR2) IS
         l_check_tts_violations NUMBER;
         l_compatibility VARCHAR2(50);
         l_migration_method VARCHAR2(21);
@@ -568,7 +577,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         CASE p_run_mode
             WHEN 'ANALYZE' THEN
                 check_tts_set;
-                log_details(p_run_mode, l_version, l_compatibility, p_ip_address, l_running_incr);
+                log_details(p_run_mode, l_version, l_compatibility, l_running_incr);
             WHEN 'EXECUTE' THEN
                 check_tts_set;
                 set_ts_readonly;
@@ -582,7 +591,7 @@ CREATE OR REPLACE PACKAGE BODY pck_migration_src AS
         END CASE;
 
         IF (p_run_mode IN ('EXECUTE','INCR')) THEN
-            closing_remarks(p_ip_address,p_run_mode,l_running_incr);
+            closing_remarks(p_run_mode,l_running_incr);
         END IF;
 
         EXCEPTION WHEN TTS_CHECK_FAILED THEN

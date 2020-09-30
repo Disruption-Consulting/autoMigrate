@@ -1,6 +1,6 @@
 #!/bin/bash
 
-zip /tmp/autoMigrate.zip  runMigration.sh pck_migration_src.sql pck_migration_tgt.sql pck_migration_rollforward.sql
+#zip /tmp/autoMigrate.zip  runMigration.sh pck_migration_src.sql pck_migration_tgt.sql pck_migration_rollforward.sql
 
 #################################################################################################################
 #
@@ -296,6 +296,8 @@ createSourceSchema(){
         /
         CREATE OR REPLACE DIRECTORY ${USER}_SCRIPT_DIR AS '${CD}';
         GRANT READ, WRITE ON DIRECTORY ${USER}_SCRIPT_DIR TO ${USER};
+        COL IP NEW_VALUE IP NOPRINT
+        SELECT UTL_INADDR.get_host_address IP FROM DUAL;
         ALTER SESSION SET CURRENT_SCHEMA=${USER};
         CREATE OR REPLACE VIEW V_APP_TABLESPACES AS
           SELECT t.tablespace_name, t.status, t.file_id, d.directory_path, d.directory_name, SUBSTR(t.file_name,pos+1) file_name, t.enabled, t.bytes
@@ -334,6 +336,7 @@ createSourceSchema(){
     			 CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));
                  
         INSERT INTO migration_log(id, name, log_message) VALUES (migration_log_seq.nextval,'PW','${PW}');
+        INSERT INTO migration_log(id, name, log_message) VALUES (migration_log_seq.nextval,'IP','&IP');
         COMMIT;
 EOF
 
@@ -388,15 +391,13 @@ EOF
 
 runSourceMigration() {
     log "runSourceMigration"
-    
-    local IP=$(hostname -I)
+
     cat <<-EOF>${SQLFILE}
     CONNECT /@${USER}
     SET SERVEROUTPUT ON
     SET LINESIZE 300
     BEGIN
         pck_migration_src.init(
-            p_ip_address=>'${IP}',
             p_run_mode=>'${MODE}', 
             p_incr_ts_dir=>'${BKPDIR}', 
             p_incr_ts_freq=>'${BKPFREQ}');
@@ -758,11 +759,64 @@ processTarget() {
     
     [[ "${REMOVE}" = "FALSE"  && (-z "${CRED}" || -z "${TNS}" || -z "${PDB}") ]] && { echo "-c <CRED> -t <TNS> -p <PDB> ALL MANDATORY."; exit 1; }
     [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "1" ]] && { log "RESTARTING MIGRATION"; runTargetMigration; }
-    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; }
+    
     
     [[ "${REMOVE}" = "TRUE"  &&  (-n "${CRED}" || -n "${TNS}") ]] && { echo "-p <PDB> -r   MUST BE THE ONLY PARAMETERS SPECIFIED."; exit 1; }
     [[ "${REMOVE}" = "TRUE"  &&  "${EXISTS}" = "0" ]] && { echo "PDB DOES NOT EXIST."; exit 1; }
     [[ "${REMOVE}" = "TRUE" ]] && { removeTarget; }
+    
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${ORACLE_SID}
+    SET SERVEROUTPUT ON
+    SET ECHO OFF 
+    DECLARE
+        l_mismatch VARCHAR2(200):=NULL;
+        n 
+    BEGIN
+        /*
+         *  CHECK THAT SOURCE TABLESPACES ARE READ ONLY IF THIS IS A DIRECT MiGRATION 
+         */
+        SELECT NVL(COUNT(*)-SUM(DECODE(status,'READ ONLY',1,0)),0) INTO n
+          FROM V_APP_TABLESPACES@migr_dblink 
+         WHERE NOT EXISTS (SELECT NULL FROM user_scheduler_jobs@migr_dblink);
+        IF (n>0) THEN
+            RAISE_APPLICATION_ERROR(-20000,'ALL SOURCE APPLICATION TABLESPACES MUST BE READ ONLY BEFORE STARTING MIGRATION.');
+        END IF;    
+        
+        /*
+         *  CHECK SOURCE AND TARGET CHARACTERSETS ARE THE SAME.
+         */        
+        FOR C IN (
+            SELECT COUNT(src) src, COUNT(tgt) tgt, property_name, property_value
+            FROM
+            (
+            SELECT 1 tgt, TO_NUMBER(NULL) src, property_name, property_value 
+            FROM database_properties WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+            UNION ALL
+            SELECT TO_NUMBER(NULL) tgt, 1 src, property_name, property_value 
+            FROM database_properties@MIGR_DBLINK WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+            )
+            GROUP BY property_name, property_value
+            ) 
+        LOOP
+            IF (C.tgt=1 AND C.src=1) THEN
+                CONTINUE;
+            END IF;
+            IF (C.src=1) THEN
+                l_mismatch:=l_mismatch||' SOURCE '||C.property_name||':'||C.property_value;
+            ELSE
+                l_mismatch:=l_mismatch||' TARGET '||C.property_name||':'||C.property_value;
+            END IF;
+        END LOOP;
+        IF (l_mismatch IS NOT NULL) THEN
+            RAISE_APPLICATION_ERROR(-20000,'CHARACTER SET MISMATCH. MUST FIRST MIGRATE TO CDB WITH SAME CHARACTERSET AND THEN RELOCATE TO AL32UTF8 CDB - '||l_mismatch;
+        END IF;
+    END;
+    /
+EOF
+    runsql || { echo "MIGRATION STOPPED. RESOLVE ISSUE AND RETRY."; exit 1; } 
+    
+    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; }
 }
 
 
