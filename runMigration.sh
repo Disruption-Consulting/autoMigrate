@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#zip /tmp/autoMigrate.zip  runMigration.sh pck_migration_src.sql pck_migration_tgt.sql pck_migration_rollforward.sql
-
 #################################################################################################################
 #
 #  SCRIPT      : runMigration.sh
@@ -51,14 +49,18 @@
 #                     Name of the PDB to be created for the migration. Typically the SOURCE database name.
 #
 #                -r removes PDB
+# 
+#                -1 suppress gathering statistics post migration
+#
+#                -2 force use of Transportable Tablespace migration method 
 #
 #                OUTPUT
 #                  log file "runMigration.log" of tasks performed to create the target PDB
-#                  for each PDB creates a log file "runMigration.PDB.log" of transfer / datapump / final tasks
+#                  for each PDB creates a log file "runMigration.PDB.log" of transfer / datapump / post-migration tasks
 #
 #
 #  SECURITY
-#                The credentials of all schemas created by the script are added to an external Oracle password wallet
+#                The credentials of all schemas created by the script are stored in an external Oracle password wallet
 #                created in the installation directory
 #
 #                Passwords are complex, randomly generated 10 character strings comprising upper/lower and special characters
@@ -298,13 +300,14 @@ createSourceSchema(){
         GRANT READ, WRITE ON DIRECTORY ${USER}_SCRIPT_DIR TO ${USER};
         COL IP NEW_VALUE IP NOPRINT
         SELECT UTL_INADDR.get_host_address IP FROM DUAL;
+        
         ALTER SESSION SET CURRENT_SCHEMA=${USER};
         CREATE OR REPLACE VIEW V_APP_TABLESPACES AS
-          SELECT t.tablespace_name, t.status, t.file_id, d.directory_path, d.directory_name, SUBSTR(t.file_name,pos+1) file_name, t.enabled, t.bytes
+          SELECT t.platform_id, t.tablespace_name, t.status, t.file_id, d.directory_path, d.directory_name, SUBSTR(t.file_name,pos+1) file_name, t.enabled, t.bytes
           FROM
             (
-             SELECT t.tablespace_name, t.status, f.file_id, f.file_name,INSTR(f.file_name,'/',-1) pos, f.bytes, v.enabled
-               FROM dba_tablespaces t, dba_data_files f, v\$datafile v
+             SELECT d.platform_id, t.tablespace_name, t.status, f.file_id, f.file_name,INSTR(f.file_name,'/',-1) pos, f.bytes, v.enabled
+               FROM dba_tablespaces t, dba_data_files f, v\$datafile v, v\$database d
               WHERE t.tablespace_name=f.tablespace_name
                 AND v.file#=f.file_id
                 AND t.contents='PERMANENT'
@@ -416,7 +419,7 @@ processSource() {
     [[ "${MODE}" =~ (^ANALYZE|EXECUTE|INCR$) ]] || { echo "-m <MODE> MUST BE ONE OF [ANALYZE|EXECUTE|INCR]. DEFAULT IS ANALYZE."; exit 1; }
     [[ "${MODE}" = "INCR"  &&  -z "${BKPDIR}" ]] && { echo "-b <BKPDIR> MUST BE SPECIFIED FOR -m INCR"; exit 1; }
     [[ "${MODE}" != "INCR"  &&  (-n "${BKPDIR}" || -n "${BKPFREQ}") ]] && { echo "-b <BKPDIR> AND -f <BKPFREQ> ONLY RELEVANT FOR -m INCR"; exit 1; }
-    [[ "${THISDB}" < "${V10103}" ]] && { echo "LOWEST VERSION WE CAN MIGRATE IS 10.1.0.3"; exit 1; }
+    [[ "${THISDB}" < "${V10103}" ]] && { echo "LOWEST VERSION WE CAN AUTO-MIGRATE IS 10.1.0.3"; exit 1; }
     
     cat <<-EOF>${SQLFILE}
     CONNECT / AS SYSDBA
@@ -506,31 +509,70 @@ createCommonUser() {
     local CPW=$(password)
     
     cat <<-EOF>${SQLFILE}
-    CONNECT / AS SYSDBA
-    CREATE USER ${USER} IDENTIFIED BY ${CPW} DEFAULT TABLESPACE SYSTEM QUOTA 1M ON SYSTEM;
-    GRANT ALTER SESSION,
-          ALTER USER,
-          CREATE DATABASE LINK,
-          CREATE PLUGGABLE DATABASE,
-          CREATE PROCEDURE,
-          CREATE SESSION,
-          CREATE SYNONYM,
-          CREATE TABLE,
-          SET CONTAINER TO ${USER};
-    GRANT SYSDBA TO ${USER} CONTAINER=ALL;
-    GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO ${USER};
-    GRANT SELECT ON SYS.CDB_DATA_FILES TO ${USER};
-    GRANT SELECT ON SYS.CDB_DIRECTORIES TO ${USER};
-    GRANT SELECT ON SYS.CDB_PDBS TO ${USER};
-    GRANT SELECT ON SYS.V_\$PDBS TO ${USER};
-    ALTER SESSION SET CURRENT_SCHEMA=${USER};
-    CREATE SEQUENCE migration_log_seq START WITH 1 INCREMENT BY 1;
-    CREATE TABLE migration_log(
-             id NUMBER,
-             name VARCHAR2(10),
-             log_time DATE DEFAULT SYSDATE,
-             log_message CLOB,
-             CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));    
+        CONNECT / AS SYSDBA
+        CREATE USER ${USER} IDENTIFIED BY ${CPW} DEFAULT TABLESPACE SYSTEM QUOTA 1M ON SYSTEM;
+        GRANT ALTER SESSION,
+              CREATE DATABASE LINK,
+              CREATE ANY DIRECTORY,
+              CREATE JOB,
+              CREATE PLUGGABLE DATABASE,
+              CREATE SESSION,
+              MANAGE SCHEDULER,
+              SET CONTAINER TO ${USER};
+        GRANT SYSDBA TO ${USER} CONTAINER=ALL;
+        GRANT EXECUTE ON SYS.DBMS_FILE_TRANSFER TO ${USER};
+        GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO ${USER};
+        GRANT SELECT ON SYS.CDB_DATA_FILES TO ${USER};
+        GRANT SELECT ON SYS.CDB_DIRECTORIES TO ${USER};
+        GRANT SELECT ON SYS.CDB_PDBS TO ${USER};
+        GRANT SELECT ON SYS.V_\$PDBS TO ${USER};
+        ALTER SESSION SET CURRENT_SCHEMA=${USER};
+        CREATE TABLE migration_ts
+                       ("PDB_NAME"          VARCHAR2(128),
+                        "TABLESPACE_NAME"   VARCHAR2(30),
+                        "ENABLED"           VARCHAR2(20),
+                        "PLATFORM_ID"       NUMBER,
+                        "FILE_ID"           NUMBER,
+                        "FILE_NAME"         VARCHAR2(100),
+                        "DIRECTORY_NAME"    VARCHAR2(30),
+                        "FILE_NAME_RENAMED" VARCHAR2(107),
+                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
+                        "START_TIME"        DATE,
+                        "ELAPSED_SECONDS"   NUMBER,
+                        "BYTES"             NUMBER,
+                        "TRANSFERRED_BYTES" NUMBER,
+                       CONSTRAINT PK_MIGRATION_TS PRIMARY KEY(PDB_NAME,FILE_ID));
+        CREATE TABLE migration_bp
+                       ("PDB_NAME"          VARCHAR2(128),
+                        "RECID"             NUMBER,
+                        "FILE_ID"           NUMBER,
+                        "BP_FILE_NAME"      VARCHAR2(100),
+                        "DIRECTORY_NAME"    VARCHAR2(30),
+                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
+                        "START_TIME"        DATE,
+                        "ELAPSED_SECONDS"   NUMBER,
+                        "BYTES"             NUMBER,
+                        "TRANSFERRED_BYTES" NUMBER,
+                        CONSTRAINT pk_migration_bp PRIMARY KEY(pdb_name,recid),
+                        CONSTRAINT fk_migration_ts FOREIGN KEY(pdb_name,file_id) REFERENCES migration_ts(pdb_name,file_id));        
+        CREATE SEQUENCE migration_log_seq START WITH 1 INCREMENT BY 1;
+        CREATE TABLE migration_log(
+                 id NUMBER DEFAULT migration_log_seq.NEXTVAL,
+                 name VARCHAR2(128),
+                 log_time DATE DEFAULT SYSDATE,
+                 log_message CLOB,
+                 CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));
+        INSERT INTO migration_log(id, name, log_message) VALUES (migration_log_seq.nextval,'CPW','${CPW}');
+        PROMPT "Compiling pck_migration_cdb.sql";
+        set echo off;
+        @@pck_migration_cdb.sql;
+        set echo on;
+        show errors;
+        BEGIN
+            execute immediate 'alter package pck_migration_cdb compile'; 
+            exception when others then raise_application_error(-20000,'compilation error');
+        END;
+        /
 EOF
     runsql || { echo "createCommonUser FAILED"; exit 1; }
     
@@ -549,6 +591,11 @@ removeTarget() {
         ALTER PLUGGABLE DATABASE ${PDB} CLOSE IMMEDIATE;
         WHENEVER SQLERROR EXIT FAILURE
         DROP PLUGGABLE DATABASE ${PDB} INCLUDING DATAFILES;
+        CONNECT /@${ORACLE_SID}
+        DROP DATABASE LINK MIGR_DBLINK_${PDB};
+        DELETE MIGRATION_BP WHERE PDB_NAME='${PDB}';
+        DELETE MIGRATION_TS WHERE PDB_NAME='${PDB}';
+        COMMIT;
 EOF
     runsql || { echo "removeTarget FAILED"; exit 1; }
     
@@ -558,18 +605,73 @@ EOF
 }
 
 
-createTargetSchema() {
-    log "createTargetSchema"
+validateTarget() {
+    log "validateTarget"
+    
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${ORACLE_SID}
+        WHENEVER SQLERROR EXIT FAILURE
+        CREATE DATABASE LINK MIGR_DBLINK_${PDB} CONNECT TO ${DBLINKUSR} IDENTIFIED BY ${DBLINKPWD} USING '${TNS}';
+        DECLARE
+            l_mismatch VARCHAR2(200):=NULL;
+            n PLS_INTEGER;
+        BEGIN
+            /*
+             *  CHECK THAT ALL SOURCE APPLICATION TABLESPACES ARE READ ONLY IF THIS IS A DIRECT MIGRATION 
+             */
+            SELECT NVL(COUNT(*)-SUM(DECODE(status,'READ ONLY',1,0)),0) INTO n
+              FROM V_APP_TABLESPACES@MIGR_DBLINK_${PDB} 
+             WHERE NOT EXISTS (SELECT NULL FROM user_scheduler_jobs@MIGR_DBLINK_${PDB});
+            IF (n>0) THEN
+                RAISE_APPLICATION_ERROR(-20000,'ALL SOURCE APPLICATION TABLESPACES MUST BE READ ONLY BEFORE STARTING MIGRATION.');
+            END IF;    
+
+            /*
+             *  CHECK SOURCE AND TARGET CHARACTERSETS ARE THE SAME.
+             */        
+            FOR C IN (
+                SELECT COUNT(src) src, COUNT(tgt) tgt, property_name, property_value
+                FROM
+                (
+                SELECT 1 tgt, TO_NUMBER(NULL) src, property_name, property_value 
+                FROM database_properties WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+                UNION ALL
+                SELECT TO_NUMBER(NULL) tgt, 1 src, property_name, property_value 
+                FROM database_properties@MIGR_DBLINK_${PDB} WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
+                )
+                GROUP BY property_name, property_value
+                ) 
+            LOOP
+                IF (C.tgt=1 AND C.src=1) THEN
+                    CONTINUE;
+                END IF;
+                IF (C.src=1) THEN
+                    l_mismatch:=l_mismatch||' SOURCE '||C.property_name||':'||C.property_value;
+                ELSE
+                    l_mismatch:=l_mismatch||' TARGET '||C.property_name||':'||C.property_value;
+                END IF;
+            END LOOP;
+            IF (l_mismatch IS NOT NULL) THEN
+                RAISE_APPLICATION_ERROR(-20000,'CHARACTER SET MISMATCH. MUST FIRST MIGRATE TO CDB WITH SAME CHARACTERSET AND THEN RELOCATE TO AL32UTF8 CDB - '||l_mismatch);
+            END IF;
+        END;
+        /
+EOF
+    runsql || { echo "MIGRATION STOPPED. RESOLVE ISSUE AND RETRY."; exit 1; } 
+}
+
+
+createTargetPdb() {
+    log "createTargetPdb"
     
     local EXISTS=$(runsql -v -s "SELECT TO_CHAR(COUNT(*)) FROM dual WHERE EXISTS (SELECT 1 FROM dba_users WHERE username='${USER}');")
     chkerr "$?" "${LINENO}" "${EXISTS}"
     
     [[ "${EXISTS}" = "0" ]] && createCommonUser
     
-    local PW=$(password)
+    validateTarget
     
-    DBLINKUSR=${CRED%%/*}
-    DBLINKPWD=${CRED#*/}
+    local PW=$(password)
     
     cat <<-EOF>${SQLFILE}
         CONNECT /@${ORACLE_SID} AS SYSDBA
@@ -580,61 +682,25 @@ createTargetSchema() {
         ALTER PLUGGABLE DATABASE ${PDB} SAVE STATE;
         AUDIT CONNECT;
         ALTER USER PDBADMIN QUOTA UNLIMITED ON SYSTEM;
-        GRANT ALTER SESSION TO PDBADMIN;
-        GRANT ALTER TABLESPACE TO PDBADMIN;
-        GRANT ANALYZE ANY TO PDBADMIN;
-        GRANT ANALYZE ANY DICTIONARY TO PDBADMIN;
-        GRANT CREATE ANY DIRECTORY TO PDBADMIN;
-        GRANT CREATE JOB TO PDBADMIN;
-        GRANT CREATE MATERIALIZED VIEW TO PDBADMIN;
-        GRANT CREATE PROCEDURE TO PDBADMIN;
-        GRANT CREATE PUBLIC DATABASE LINK TO PDBADMIN;
-        GRANT CREATE SESSION TO PDBADMIN;
-        GRANT CREATE TABLE TO PDBADMIN;
-        GRANT CREATE TABLESPACE TO PDBADMIN;
-        GRANT DROP ANY DIRECTORY TO PDBADMIN;
-        GRANT DROP TABLESPACE TO PDBADMIN;
-        GRANT DROP USER TO PDBADMIN;
-        GRANT MANAGE SCHEDULER TO PDBADMIN;
-        GRANT SELECT ANY DICTIONARY TO PDBADMIN;
-        GRANT EXECUTE ON SYS.DBMS_BACKUP_RESTORE TO PDBADMIN;
-        GRANT EXECUTE ON SYS.DBMS_FILE_TRANSFER TO PDBADMIN;
-        GRANT EXECUTE ON SYS.DBMS_SYSTEM TO PDBADMIN;
-        GRANT EXECUTE ON SYS.DBMS_CRYPTO TO PDBADMIN;
+        GRANT ALTER SESSION,
+              ANALYZE ANY,
+              ANALYZE ANY DICTIONARY,
+              CREATE ANY DIRECTORY,
+              CREATE PUBLIC DATABASE LINK,
+              CREATE SESSION,
+              CREATE TABLESPACE,
+              DROP TABLESPACE,
+              DROP ANY DIRECTORY,
+              SELECT ANY DICTIONARY TO PDBADMIN;
+              
         CREATE DIRECTORY MIGRATION_SCRIPT_DIR AS '${CD}';
         GRANT READ, WRITE ON DIRECTORY MIGRATION_SCRIPT_DIR TO PDBADMIN;
+        
         COL con_id NEW_VALUE con_id noprint;
         COL filepath NEW_VALUE filepath noprint;
         SELECT SYS_CONTEXT('USERENV','CON_ID') AS con_id FROM dual;
         SELECT MAX(SUBSTR(file_name,1,INSTR(file_name,'/',-1)-1)) AS filepath FROM cdb_data_files WHERE con_id=&con_id;
-        CREATE OR REPLACE DIRECTORY TGT_FILES_DIR AS '&filepath';
-        GRANT READ, WRITE ON DIRECTORY TGT_FILES_DIR TO PDBADMIN;
-        CREATE TABLE PDBADMIN.migration_ts
-                       ("TABLESPACE_NAME"   VARCHAR2(30),
-                        "ENABLED"           VARCHAR2(20),
-                        "PLATFORM_ID"       NUMBER,
-                        "FILE_ID"           NUMBER,
-                        "FILE_NAME"         VARCHAR2(100),
-                        "DIRECTORY_NAME"    VARCHAR2(30),
-                        "FILE_NAME_RENAMED" VARCHAR2(107),
-                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
-                        "START_TIME"        DATE,
-                        "ELAPSED_SECONDS"   NUMBER,
-                        "BYTES"             NUMBER,
-                        "TRANSFERRED_BYTES" NUMBER,
-                       CONSTRAINT PK_MIGRATION_TS PRIMARY KEY(FILE_ID));
-        CREATE TABLE PDBADMIN.migration_bp
-                       ("RECID"             NUMBER,
-                        "FILE_ID"           NUMBER,
-                        "BP_FILE_NAME"      VARCHAR2(100),
-                        "DIRECTORY_NAME"    VARCHAR2(30),
-                        "MIGRATION_STATUS"  VARCHAR2(50) DEFAULT 'TRANSFER NOT STARTED',
-                        "START_TIME"        DATE,
-                        "ELAPSED_SECONDS"   NUMBER,
-                        "BYTES"             NUMBER,
-                        "TRANSFERRED_BYTES" NUMBER,
-                        CONSTRAINT pk_migration_bp PRIMARY KEY(recid),
-                        CONSTRAINT fk_migration_ts FOREIGN KEY(file_id) REFERENCES PDBADMIN.migration_ts(file_id));
+
         CREATE SEQUENCE PDBADMIN.migration_log_seq START WITH 1 INCREMENT BY 1;
         CREATE TABLE PDBADMIN.migration_log
                        ("ID"            NUMBER DEFAULT PDBADMIN.migration_log_seq.NEXTVAL,
@@ -642,39 +708,31 @@ createTargetSchema() {
                         "LOG_MESSAGE"   CLOB,
                         CONSTRAINT PK_MIGRATION_LOG PRIMARY KEY(id));
         CREATE PUBLIC DATABASE LINK MIGR_DBLINK CONNECT TO ${DBLINKUSR} IDENTIFIED BY ${DBLINKPWD} USING '${TNS}';
-        PROMPT "Compiling pck_migration_tgt.sql";
+        CONNECT /@${ORACLE_SID}
+        CREATE OR REPLACE DIRECTORY TGT_FILES_DIR_${PDB} AS '&filepath';
+EOF
+    runsql || { echo "createTargetPdb FAILED"; exit 1; }
+    
+    createCredential "${PDB}" "PDBADMIN" "${PW}" "${PDB}" 
+    
+    local CPW=$(runsql -v -c "${ORACLE_SID}" -s "SELECT log_message FROM ${USER}.migration_log WHERE name='CPW';")
+    chkerr "$?" "${LINENO}" "${CPW}"
+    
+    cat <<-EOF>${SQLFILE}
+        CONNECT /@${PDB}
+        CREATE DATABASE LINK MIGR_DBLINK_CDB CONNECT TO ${USER} IDENTIFIED BY ${CPW} USING '//localhost/${ORACLE_SID}';
+        PROMPT "Compiling pck_migration_pdb.sql";
         set echo off;
-        @@pck_migration_tgt.sql;
+        @@pck_migration_pdb.sql;
         set echo on;
         show errors;
         BEGIN
-            execute immediate 'alter package pdbadmin.pck_migration_tgt compile'; 
+            execute immediate 'alter package pdbadmin.pck_migration_pdb compile'; 
             exception when others then raise_application_error(-20000,'compilation error');
         END;
         /
-        GRANT SELECT, UPDATE ON PDBADMIN.MIGRATION_TS TO ${USER} CONTAINER=CURRENT;
-        GRANT SELECT, UPDATE ON PDBADMIN.MIGRATION_BP TO ${USER} CONTAINER=CURRENT;
-        GRANT SELECT ON PDBADMIN.migration_log_seq TO ${USER} CONTAINER=CURRENT;
-        GRANT SELECT, INSERT ON PDBADMIN.MIGRATION_LOG TO ${USER} CONTAINER=CURRENT;
-        CONNECT /@${ORACLE_SID}
-        WHENEVER SQLERROR CONTINUE
-        DROP DATABASE LINK PDB_DBLINK;
-        WHENEVER SQLERROR EXIT FAILURE
-        CREATE DATABASE LINK PDB_DBLINK CONNECT TO PDBADMIN IDENTIFIED BY ${PW} USING '//localhost/${PDB}';
-        PROMPT "Compiling pck_migration_rollforward.sql";
-        set echo off;
-        @@pck_migration_rollforward.sql;
-        set echo on;
-        show errors;
-        BEGIN
-            execute immediate 'alter package pck_migration_rollforward compile'; 
-            exception when others then raise_application_error(-20000,'compilation error');
-        END;
-        /        
 EOF
-    runsql || { echo "createTargetSchema FAILED"; exit 1; }
-    
-    createCredential "${PDB}" "PDBADMIN" "${PW}" "${PDB}" 
+    runsql || { echo "createTargetPdb - MIGR_DBLINK_CDB FAILED"; exit 1; }
 }
 
 
@@ -686,19 +744,22 @@ createTargetRunScripts() {
     cat <<-EOF>${RUNSCRIPT}.sql
         whenever sqlerror exit failure
         set echo on
-        connect /@${PDB}
-            exec pck_migration_tgt.transfer
-            col all_ts_readonly new_value all_ts_readonly noprint
-            SELECT TO_CHAR(COUNT(*)-SUM(DECODE(enabled,'READ ONLY',1,0))) all_ts_readonly FROM migration_ts;
+        set serveroutput on
+        set linesize 300
+        variable n number
         connect /@${ORACLE_SID}
-            exec pck_migration_rollforward.apply
+        begin
+            :n:=pck_migration_cdb.transfer(pPdbname=>'${PDB}');
+            dbms_output.put_line('pck_migration_cdb.transfer(${PDB}):'||:n);
+        end;
+        /
         connect /@${PDB}
-            begin
-                if ('&all_ts_readonly'='0') then
-                    pck_migration_tgt.impdp(pOverride=>${OVERRIDE},pDbmsStats=>${DBMSSTATS});
-                end if;
-            end;
-            /
+        begin
+            if (:n=0) then
+                pck_migration_pdb.impdp(pOverride=>${OVERRIDE},pDbmsStats=>${DBMSSTATS});
+            end if;
+        end;
+        /
         exit
 EOF
 
@@ -713,7 +774,7 @@ export PATH=\${ORACLE_HOME}/bin:${PATH}
 export TNS_ADMIN=${CD}
 
 sqlplus /nolog @${RUNSCRIPT}.sql
-[[ \$? = 0 ]] && { echo "Completed transfer successfully. Now starting datapump"; } || { echo "FAILED TO RUN ${RUNSCRIPT}.sql"; exit 1; }
+[[ \$? = 0 ]] && { echo "TRANSFER COMPLETED"; } || { echo "FAILED TO RUN ${RUNSCRIPT}.sql"; exit 1; }
 
 . ${RUNSCRIPT}.impdp.sh
 
@@ -728,22 +789,22 @@ runTargetMigration() {
     
     local RUNSCRIPT="${CD}/${FN}.${PDB}"
     
-    [[ -f "${RUNSCRIPT}.sh" ]] || createTargetRunScripts "${RUNSCRIPT}"
+    createTargetRunScripts "${RUNSCRIPT}"
 
     cat <<-EOF>${SQLFILE}
+        CONNECT /@${ORACLE_SID}
+        column repeat_interval new_value repeat_interval
+        SELECT MAX(repeat_interval) repeat_interval FROM user_scheduler_jobs@migr_dblink_${PDB};
+        
         CONNECT /@${ORACLE_SID} AS SYSDBA
-        ALTER SESSION SET CONTAINER=${PDB};
-        DECLARE
-            l_repeat_interval user_scheduler_jobs.repeat_interval%type;
-        BEGIN
-            SELECT MAX(repeat_interval) INTO l_repeat_interval FROM user_scheduler_jobs@migr_dblink;
+        BEGIN 
             DBMS_SCHEDULER.CREATE_JOB(
                 job_name=>'MIGRATION',
                 job_type=>'EXECUTABLE',
                 start_date=>SYSTIMESTAMP,
                 enabled=>TRUE,
                 job_action=>'${RUNSCRIPT}.sh',
-                repeat_interval=>l_repeat_interval);
+                repeat_interval=>'&repeat_interval');
         END;
         /
 EOF
@@ -759,64 +820,11 @@ processTarget() {
     
     [[ "${REMOVE}" = "FALSE"  && (-z "${CRED}" || -z "${TNS}" || -z "${PDB}") ]] && { echo "-c <CRED> -t <TNS> -p <PDB> ALL MANDATORY."; exit 1; }
     [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "1" ]] && { log "RESTARTING MIGRATION"; runTargetMigration; }
+    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "0" ]] && { createTargetPdb; runTargetMigration; }
     
-    
-    [[ "${REMOVE}" = "TRUE"  &&  (-n "${CRED}" || -n "${TNS}") ]] && { echo "-p <PDB> -r   MUST BE THE ONLY PARAMETERS SPECIFIED."; exit 1; }
+    [[ "${REMOVE}" = "TRUE"  &&  (-n "${CRED}" || -n "${TNS}") ]] && { echo "-p <PDB> -r   MUST BE THE ONLY PARAMETERS SPECIFIED TO REMOVE PDB"; exit 1; }
     [[ "${REMOVE}" = "TRUE"  &&  "${EXISTS}" = "0" ]] && { echo "PDB DOES NOT EXIST."; exit 1; }
     [[ "${REMOVE}" = "TRUE" ]] && { removeTarget; }
-    
-    cat <<-EOF>${SQLFILE}
-        CONNECT /@${ORACLE_SID}
-    SET SERVEROUTPUT ON
-    SET ECHO OFF 
-    DECLARE
-        l_mismatch VARCHAR2(200):=NULL;
-        n 
-    BEGIN
-        /*
-         *  CHECK THAT SOURCE TABLESPACES ARE READ ONLY IF THIS IS A DIRECT MiGRATION 
-         */
-        SELECT NVL(COUNT(*)-SUM(DECODE(status,'READ ONLY',1,0)),0) INTO n
-          FROM V_APP_TABLESPACES@migr_dblink 
-         WHERE NOT EXISTS (SELECT NULL FROM user_scheduler_jobs@migr_dblink);
-        IF (n>0) THEN
-            RAISE_APPLICATION_ERROR(-20000,'ALL SOURCE APPLICATION TABLESPACES MUST BE READ ONLY BEFORE STARTING MIGRATION.');
-        END IF;    
-        
-        /*
-         *  CHECK SOURCE AND TARGET CHARACTERSETS ARE THE SAME.
-         */        
-        FOR C IN (
-            SELECT COUNT(src) src, COUNT(tgt) tgt, property_name, property_value
-            FROM
-            (
-            SELECT 1 tgt, TO_NUMBER(NULL) src, property_name, property_value 
-            FROM database_properties WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
-            UNION ALL
-            SELECT TO_NUMBER(NULL) tgt, 1 src, property_name, property_value 
-            FROM database_properties@MIGR_DBLINK WHERE property_name IN ('NLS_CHARACTERSET','NLS_NCHAR_CHARACTERSET')
-            )
-            GROUP BY property_name, property_value
-            ) 
-        LOOP
-            IF (C.tgt=1 AND C.src=1) THEN
-                CONTINUE;
-            END IF;
-            IF (C.src=1) THEN
-                l_mismatch:=l_mismatch||' SOURCE '||C.property_name||':'||C.property_value;
-            ELSE
-                l_mismatch:=l_mismatch||' TARGET '||C.property_name||':'||C.property_value;
-            END IF;
-        END LOOP;
-        IF (l_mismatch IS NOT NULL) THEN
-            RAISE_APPLICATION_ERROR(-20000,'CHARACTER SET MISMATCH. MUST FIRST MIGRATE TO CDB WITH SAME CHARACTERSET AND THEN RELOCATE TO AL32UTF8 CDB - '||l_mismatch;
-        END IF;
-    END;
-    /
-EOF
-    runsql || { echo "MIGRATION STOPPED. RESOLVE ISSUE AND RETRY."; exit 1; } 
-    
-    [[ "${REMOVE}" = "FALSE"  && "${EXISTS}" = "0" ]] && { createTargetSchema; runTargetMigration; }
 }
 
 
@@ -869,14 +877,18 @@ case "${DB}" in
         DBMSSTATS=TRUE
         OVERRIDE=FALSE
         REMOVE=FALSE
-        while getopts ":c:t:p:rh12" o; do
+        while getopts ":c:t:p:rh12z" o; do
             case "${o}" in
-                c)  CRED=${OPTARG} ;;
+                c)  CRED=${OPTARG} 
+                    DBLINKUSR=${CRED%%/*}
+                    DBLINKPWD=${CRED#*/}
+                    ;;
                 t)  TNS=${OPTARG} ;;
                 p)  PDB=$(upper ${OPTARG}) ;;
                 r)  REMOVE=TRUE ;;
                 1)  DBMSSTATS=FALSE ;;
                 2)  OVERRIDE=TRUE ;;
+                z)  zip autoMigrate.zip  runMigration.sh pck_migration_src.sql pck_migration_cdb.sql pck_migration_pdb.sql ;;
                 h)  usageTarget ;;
                 :)  echo "ERROR -${OPTARG} REQUIRES  ARGUMENT"
                     usageTarget
