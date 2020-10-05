@@ -18,13 +18,14 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs 735 PDBs consolidated within 5 CDBs. In addition, test and development databases which are mostly unused can now be consolidated into a single CDB and hosted on cheap infrastructure, considerably reducing software licensing costs. CDB also enables database self-provisioning, drastically reducing project timescales; likewise, creating database copies for tests is now a 5 minute PDB clone operation. Being able to backup and upgrade a single CDB infers saving the cost of duplicating these costly tasks for each of the contained PDBs.  The same Mobiliar company managed to upgrade all of its 735 PDBs from version 12.2 to 19 over a single weekend, an impossible undertaking for 735 NON-CDBs.
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, caution reigns supreme in the world of I.T. management so many more organizations are facing something of a mad rush to get their database farms upgraded before it's too late (see diagram below). 
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
+While upgrading is always the preferred option - e.g. upgrading your database from version 12.1.0.2 to 19.8 - there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data has to be physically moved. 
 
-The "autoMigrate" utility provides a framework for coordinating the large number of tasks involved in database migration, including:
+The "autoMigrate" utility was developed to  provide a framework for coordinating the large number of tasks involved in such projects. These include:
 
 - data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
@@ -36,7 +37,7 @@ The "autoMigrate" utility provides a framework for coordinating the large number
 - ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-A key advantage of autoMigrate is fully integrated functionality to migrate large volumes of data with minimal application downtime. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility.
+One of the most challenging aspects of database migration is minimizing application downtime, which invariably means how to reduce the time taken to copy the data. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. Oracle's response to this is either use its separately licensed Golden Gate option or wrestle with its approximate 7000 line Perl script which requires maintaining configuration files on both source and target servers.
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
