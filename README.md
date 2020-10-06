@@ -3,10 +3,10 @@ Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minima
 
 - uses functionality exclusively included in the basic software license
 - reduces application downtime to a minimum
-- supported source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
+- source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - target database versions 19.3 through 19.8 (CDB)
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs leading to a considerable reduction in the cost of ownership.
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. As a simple example, 100 seldom used NON-CDB test databases might require supporting infrastructure of 1000 GB of memory and 100 CPUs -  properly resource-managed, these same 100 databases migrated as PDBs hosted on a single CDB might only require 100 GB of memory and 10 CPUs. Assuming processor-based licensing, the cost 
 
 # OVERVIEW
 
