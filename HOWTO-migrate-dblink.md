@@ -1,6 +1,6 @@
 ANALYZE DB LINK USAGE
 ---------------------
-runMigration.sh on the SOURCE database lists all DB LINKs it contains together with an indication of whether the link is functional.
+runMigration.sh on the SOURCE database lists all DB LINKs together with an indication of whether each link is functional.
 
 In the first instance, this should be discussed with the Application owner to confirm whether listed DB LINKs are required. We cannot assume that a functioning DB LINK is actually required by the Application; I've seen many cases where functioning DB LINKs have been created, found to be no longer required but not dropped. In other cases, DB LINKs are redefined at run-time according to some dynamic routing requirement. 
 
@@ -27,7 +27,7 @@ If using tns-name then we have to ensure that the entry has been migrated from t
 
 In the other 2 cases, routing is hard-coded in the definition itself; tnsnames.ora is not relevant but the links will only work if SQLNET network connectivity from the new target server is enabled. 
 
-In order to enhance understanding of actual DB LINK usage, it helps enourmously if the effected databases have implemented AUDIT SESSION, since monitoring DB LINK usage is as simple as issuing the following query which will reveal whether DB LINKs are used:
+In order to enhance understanding of actual DB LINK usage, it helps enourmously if the effected databases have implemented AUDIT SESSION, since monitoring DB LINK usage is as simple as issuing the following query. All Oracle databases should AUDIT SESSION as an absolute minimum.
 
 ```
 CONNECT /AS SYSDBA
