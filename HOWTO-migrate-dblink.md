@@ -31,12 +31,15 @@ EOF
 export ORACLE_SID=DMPROD
 
 sqlplus /nolog<<EOF
-CONNECT /AS SYSDBA
+CONNECT USER/PASSWORD
 
 Rem --------------
 Rem Best practices
 Rem --------------
 Rem The following is a "private fixed user" DB LINK, which includes the authentication details of the remote database user.
+Rem Note that we connected USER/PASSWORD. You cannot create database links in other schemas from a privileged user unless you obtain that schema's
+Rem password, temporarily reset it, connect and create the db link, and finally reset the password to its original value. One of the best accounts of
+Rem how this is done can be found here http://www.peasland.net/2016/02/18/oracle-12c-identified-by-values
 Rem
 Rem The USING clause refers to a TNS alias entry in DMPROD's tnsnames.ora network configuration file. Note that he TNS entry or
 Rem EZ Naming syntax can also be employed as in the equivalent USING '//10.1.25.21/SLSPROD' - however, as explained below, this is
