@@ -124,9 +124,9 @@ exit
 
 Note on Switching homes (LINUX)
 -------------------------------
-Easily accessing multiple Oracle databases built from different homes on the same server can be achieved by configuring functions in the "oracle" account's ".bash_profile" file.
+Easily accessing multiple Oracle databases built from different homes on the same server can be achieved by configuring functions in the "oracle" account's ".bashrc" file.
 
-For example, if you have used the "dbac" utility to create a v18 database CDB18 and a v19 database CDB19, then the following functions in ".bash_profile" allow easy acesss to both:
+For example, if you have used the "dbac" utility to create a v18 database CDB18 and a v19 database CDB19, then the following functions in ".bashrc" allow easy acesss to both:
 
 ```
 CDB19 () { ORACLE_SID=CDB19; ORAENV_ASK=NO; . oraenv; ORAENV_ASK=YES; }
