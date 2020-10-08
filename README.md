@@ -6,38 +6,38 @@ Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minima
 - source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - target database versions 19.3 through 19.8 (CDB)
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by all of its PDBs. As a simple example, 100 seldom used NON-CDB test databases might require supporting infrastructure of 1000 GB of memory and 100 CPUs -  properly resource-managed, these same 100 databases migrated as PDBs hosted on a single CDB might only require 100 GB of memory and 10 CPUs. Assuming processor-based licensing, the cost 
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by up to 252 PDBs, which can have a transformative effect on an organization's I.T. spend whilst greatly improving its business responsiveness.
 
 # OVERVIEW
 
 Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
 
-- version 19 has the longest support timeframe
-- legacy databases are fast reaching end-of-life incurring significant extra support costs
+- version 19 offers Premier and Extended support until 2024 and 2027 respectively
+- all earlier version databases are fast reaching end-of-life incurring significant extra support costs
 - NON-CDB is deprecated as of version 20
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, caution reigns supreme in the world of I.T. management so many more organizations are facing something of a mad rush to get their database farms upgraded before it's too late (see diagram below). 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, the majority of Oracle customers are facing something of a mad rush to get their database farms upgraded before it's too late (see diagram below). 
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
-While upgrading is always the preferred option - e.g. upgrading your database from version 12.1.0.2 to 19.8 - there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data has to be physically moved. 
+While upgrading is always the preferred option, there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. The best online resource for Oracle upgrade / migration is https://mikedietrichde.com
 
-The "autoMigrate" utility was developed to  provide a framework for coordinating the large number of tasks involved in such projects. These include:
+The "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved in such projects. These include:
 
 - data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
 - copying metadata definitions from source to target 
 - reconciling transferred data and metadata
 - gathering accurate statistics of transferred data objects
-- confirming use of any DIRECTORY objects in source that may need to be redefined in target
+- confirming use of any DIRECTORY objects in source that may need to be reconfigured in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
-- ensuring grants of SYS-owned source objects to application schemas are replayed in the target database
+- ensuring grants of any SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-One of the most challenging aspects of database migration is minimizing application downtime, which invariably means how to reduce the time taken to copy the data. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. Oracle's response to this is either use its separately licensed Golden Gate option or wrestle with its approximate 7000 line Perl script which requires maintaining configuration files on both source and target servers.
+One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. Oracle's response to this is either use its separately licensed Golden Gate option or wrestle with its approximate 7000 line Perl script which requires maintaining configuration files on both source and target servers.
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
