@@ -1,6 +1,6 @@
 BACKGROUND
 ----------
-This HOWTO explains how to configure and use the Oracle External Password store, which enables password-less connections to Oracle programs like sqlplus and expdp/impdp. In earlier versions (pre 10), the ability to run scripts without passwords was achieved by External Oracle accounts whereby an OS system account would be defined in the Oracle database as "IDENTIFIED EXTERNALLY"; in this way, the OS user would logon to their password-protected host operating system account and then connect to their corresponding Oracle account by entering "sqlplus /". 
+The Oracle External Password store enables password-less connections to Oracle programs like sqlplus and expdp/impdp. In earlier versions (pre 10), the ability to run scripts without passwords was achieved by External Oracle accounts whereby an OS system account would be defined in the Oracle database as "IDENTIFIED EXTERNALLY"; in this way, the OS user would logon to their password-protected host operating system account and then connect to their corresponding Oracle account by entering "sqlplus /". 
 
 With the External Password Store, credentials of Oracle accounts are maintained in an Oracle wallet enabling user access through "sqlplus /@TNSNAME" where TNSNAME is an entry in the current tnsnames.ora file. In this way, the overhead and risk of maintaining host operating system accounts is removed, whilst enabling much greater flexibility and range of access.
 
