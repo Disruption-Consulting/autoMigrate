@@ -53,11 +53,11 @@ mkstore -wrl wallet
 2. Add credentials to the Wallet
 --------------------------------
 ```
-# create credential named DB1_TESTUSER for TESTUSER with password "AvP2t23#Z+"
+# create credential named DB1_TESTUSER for Oracle user account TESTUSER with password "AvP2t23#Z+"
 
 mkstore -wrl wallet -createCredential DB1_TESTUSER  TESTUSER  "AvP2t23#Z+"
 
-# mkstore prompts once for wallet password used to create wallet in previous step
+# mkstore prompts once for the wallet password entered twice in the previous step
 # note use of double quotes surrounding the password enables any printable character to be used enhancing security
 ```
 
@@ -74,7 +74,7 @@ EOF
 4. Configure sqlnet.ora
 -----------------------
 ```
-# sqllnet.ora includes location of wallet plus directive allowing use of password-less connections
+# sqlnet.ora includes location of wallet plus directive allowing use of password-less connections
 
 cat >/tmp/sqlnet.ora<<EOF
 WALLET_LOCATION = (SOURCE = (METHOD = FILE)(METHOD_DATA =(DIRECTORY = /tmp/wallet)))
@@ -89,9 +89,7 @@ sqlplus /@DB1_TESTUSER
 ERROR:
 ORA-12154: TNS:could not resolve the connect identifier specified
 
-# .. which is normal because TNS_ADMIN is unset and points by default to $ORACLE_HOME/network/admin
-
-# Let's set it to the location of our wallet and local network configuration files and retry
+# Let's set TNS_ADMIN to the location of our wallet and local network configuration files and retry
 
 export TNS_ADMIN=/tmp
 
