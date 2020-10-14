@@ -1,7 +1,7 @@
 # automigrate
-Utility to consistently migrate legacy NON-CDB Oracle databases to PDB at minimal cost and delay.
+Utility to consistently migrate NON-CDB Oracle databases to PDB at minimal cost and delay.
 
-- uses functionality exclusively included in the basic software license
+- uses features only included in the basic Enterprise Edition software license
 - reduces application downtime to a minimum
 - source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
 - target database versions 19.3 through 19.8 (CDB)
@@ -12,18 +12,21 @@ Oracle's Multitenant architecture improves use of resources by consolidating mul
 
 Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
 
-- version 19 offers Premier and Extended support until 2024 and 2027 respectively
+- version 19 offers Premier and Extended support until April 2024 and April 2027 respectively
 - all earlier version databases are fast reaching end-of-life incurring significant extra support costs
 - NON-CDB is deprecated as of version 20
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
-- version 19 enables limited cost-free use of features like in-Memory which can drastically improve performance
+- version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, the majority of Oracle customers are facing something of a mad rush to get their database farms upgraded before it's too late (see diagram below). 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, many more Oracle customers are facing something of a rush to get their database farms upgraded before it's too late (see diagram below). 
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
-While upgrading is always the preferred option, there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. The best online resource for Oracle upgrade / migration is https://mikedietrichde.com
+For example, if your organization runs its Oracle version 12.1.0.2 databases with the OLAP, Partitioning and Diagnostics Pack on infrastructure powered by say, 100 CPU cores (Intel) then its annual support costs are:
+
+
+Beyond , there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. 
 
 The "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved in such projects. These include:
 
@@ -131,3 +134,10 @@ Copy/paste the command displayed after running the script on the SOURCE server, 
 - creates dblink using above details within the PDB
 - transfers data files from SOURCE to TARGET
 - runs DATAPUMP to integrate the data files, copy metadata and perform post-migration tasks.
+
+
+## REFERENCES 
+
+Oracle Product Manager for upgrades / migration maintains a comprehensive blog at https://mikedietrichde.com
+
+Oracle Global Pricing (September 2020) https://www.oracle.com/assets/technology-price-list-070617.pdf
