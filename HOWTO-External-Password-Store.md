@@ -58,7 +58,7 @@ mkstore -wrl wallet
 mkstore -wrl wallet -createCredential DB1_TESTUSER  TESTUSER  "AvP2t23#Z+"
 
 # mkstore prompts once for wallet password used to create wallet in previous step
-# note use of double quotes surrounding the password enables any printable character to be used
+# note use of double quotes surrounding the password enables any printable character to be used enhancing security
 ```
 
 3. Add entry to tnsnames.ora 
@@ -112,3 +112,29 @@ SQL> show user
 USER is "TESTUSER"
 
 ```
+
+The original script that included a hard-coded password can now be re-written as:
+
+
+```
+#!/bin/bash
+
+ORACLE_SID=${1}                      # Establish ORACLE_SID of the object Oracle database (will be the CDB if running multitenant)
+ORAENV_ASK=NO                        # Call the Oracle-supplied oraenv script to source the environment for ORACLE_SID without prompts
+. oraenv                             # Sets ORACLE_HOME and PATH from details held in /etc/oratab for the ORACLE_SID
+
+export TNS_ADMIN=/tmp                # Set TNS_ADMIN to point to directory /tmp
+sqlplus /@DB1_TESTUSER<<EOF          # Routing information retrieved from /tmp/tnsnames.ora. Password obtained from wallet.
+  exec schema.procedure
+EOF
+
+exit
+```
+
+CONSOLIDATING ACCOUNTS
+----------------------
+The External password store is used throughout the runMigration.sh script in order to minimize use of external access implicitly through the "oracle" software account owner (i.e. sqlplus / as sysdba)
+
+In order to avoid changing a running Production environment, the wallet is created and maintained in the current directory at the time runMigration.sh is run - e.g. /tmp
+
+However, in a new target environment it would be recommended to maintain a single wallet and set of configuration files in $ORACLE_HOME/network/admin in order to avoid hard-coding passwords in connection requests by default, either through scripts or online.
