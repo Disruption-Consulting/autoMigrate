@@ -2,7 +2,7 @@ BACKGROUND
 ----------
 This HOWTO explains how to configure and use the Oracle External Password store, which enables password-less connections to Oracle programs like sqlplus and expdp/impdp. In earlier versions (pre 10), the ability to run scripts without passwords was achieved by External Oracle accounts whereby an OS system account would be defined in the Oracle database as "IDENTIFIED EXTERNALLY"; in this way, the OS user would logon to their password-protected host operating system account and then connect to their corresponding Oracle account by entering "sqlplus /". 
 
-With the External Password Store, credentials of Oracle accounts are maintained in an Oracle wallet enabling user access through "sqlplus /@TNSNAME" where TNSNAME is an entry in the current tnsnames.ora file. In this way, the overhead and risk of maintaining host operating system accounts is removed. 
+With the External Password Store, credentials of Oracle accounts are maintained in an Oracle wallet enabling user access through "sqlplus /@TNSNAME" where TNSNAME is an entry in the current tnsnames.ora file. In this way, the overhead and risk of maintaining host operating system accounts is removed, whilst enabling much greater flexibility and range of access.
 
 The use of External Password Store is the recommended mechanism for securely managing user access to Oracle accounts.
 
@@ -31,7 +31,7 @@ ORAENV_ASK=NO                        # Call the Oracle-supplied oraenv script to
 . oraenv                             # Sets ORACLE_HOME and PATH from details held in /etc/oratab for the ORACLE_SID
 
 export TNS_ADMIN=/tmp                # Set TNS_ADMIN to point to directory /tmp
-sqlplus user/password@alias<<EOF     # Routing information for "alias" retrieved from /tmp/tnsnames.ora
+sqlplus user/password@DB1<<EOF       # Routing information for "DB1" retrieved from /tmp/tnsnames.ora. Password hard-coded in script.
   exec schema.procedure
 EOF
 
@@ -43,15 +43,72 @@ By configuring an External Password store in /tmp we can avoid hard-coding user 
 
 1. Create Oracle Wallet
 -----------------------
+```
+cd /tmp
+mkstore -wrl wallet
 
-
+# mkstore prompts twice for a wallet password and creates directory /tmp/wallet
+```
 
 2. Add credentials to the Wallet
 --------------------------------
+```
+# create credential named DB1_TESTUSER for TESTUSER with password "AvP2t23#Z+"
+
+mkstore -wrl wallet -createCredential DB1_TESTUSER  TESTUSER  "AvP2t23#Z+"
+
+# mkstore prompts once for wallet password used to create wallet in previous step
+# note use of double quotes surrounding the password enables any printable character to be used
+```
 
 3. Add entry to tnsnames.ora 
 ----------------------------
+```
+# add entry for alias DB1_TESTUSER to /tmp/tnsnames.ora
 
+cat >>/tmp/tnsnames.ora<<EOF
+DB1_TESTUSER=(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=10.1.25.10)(PORT=1521))(CONNECT_DATA=(SERVER=DEDICATED)(SERVICE_NAME=DB1)))
+EOF
+```
 
 4. Configure sqlnet.ora
 -----------------------
+```
+# sqllnet.ora includes location of wallet plus directive allowing use of password-less connections
+
+cat >/tmp/sqlnet.ora<<EOF
+WALLET_LOCATION = (SOURCE = (METHOD = FILE)(METHOD_DATA =(DIRECTORY = /tmp/wallet)))
+SQLNET.WALLET_OVERRIDE = TRUE
+EOF
+
+
+# At this point if we try to run sqlplus and connect as user TESTUSER it will fail
+
+sqlplus /@DB1_TESTUSER
+
+ERROR:
+ORA-12154: TNS:could not resolve the connect identifier specified
+
+# .. which is normal because TNS_ADMIN is unset and points by default to $ORACLE_HOME/network/admin
+
+# Let's set it to the location of our wallet and local network configuration files and retry
+
+export TNS_ADMIN=/tmp
+
+sqlplus /@DB1_TESTUSER
+
+SQL*Plus: Release 19.0.0.0.0 - Production on Wed Oct 14 11:47:50 2020
+Version 19.8.0.0.0
+
+Copyright (c) 1982, 2020, Oracle.  All rights reserved.
+
+Last Successful login time: Tue Oct 13 2020 13:50:43 +00:00
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.8.0.0.0
+
+SQL> show user
+USER is "TESTUSER"
+
+```
