@@ -26,19 +26,19 @@ For example, a script may set TNS_ADMIN to a specified directory before running 
 ```
 #!/bin/bash
 
-ORACLE_SID=${1}                      # Establish ORACLE_SID of the object Oracle database (will be the CDB if running multitenant)
-ORAENV_ASK=NO                        # Call the Oracle-supplied oraenv script to source the environment for ORACLE_SID without prompts
-. oraenv                             # Sets ORACLE_HOME and PATH from details held in /etc/oratab for the ORACLE_SID
+ORACLE_SID=${1}                          # Establish ORACLE_SID of the object Oracle database (will be the CDB if running multitenant)
+ORAENV_ASK=NO                            # Call the Oracle-supplied oraenv script to source the environment for ORACLE_SID without prompts
+. oraenv                                 # Sets ORACLE_HOME and PATH from details held in /etc/oratab for the ORACLE_SID
 
-export TNS_ADMIN=/tmp                # Set TNS_ADMIN to point to directory /tmp
-sqlplus user/password@DB1<<EOF       # Routing information for "DB1" retrieved from /tmp/tnsnames.ora. Password hard-coded in script.
+export TNS_ADMIN=/tmp                    # Set TNS_ADMIN to point to directory /tmp
+sqlplus TESTUSER/Dogface34@DB1<<EOF      # Routing information for "DB1" retrieved from /tmp/tnsnames.ora. The password is hard-coded.
   exec schema.procedure
 EOF
 
 exit
 ```
 
-By configuring an External Password store in /tmp we can avoid hard-coding user passwords in scripts when TNS_ADMIN points to the drectory containing a valid wallet and supporting network configuration files.
+By configuring an External Password store in /tmp we can avoid hard-coding user passwords by pointing TNS_ADMIN to the drectory containing network configuration files supporting wallet-protected tns aliases....
 
 
 1. Create Oracle Wallet
@@ -74,7 +74,8 @@ EOF
 4. Configure sqlnet.ora
 -----------------------
 ```
-# sqlnet.ora includes location of wallet plus directive allowing use of password-less connections
+# sqlnet.ora includes location of wallet plus directive allowing use of password-less connections. Here, we've configured the wallet in the same
+# directory as the network files but this is not mandatory. The DIRECTORY clause in WALLET_LOCATION indicates where the wallet is stored.
 
 cat >/tmp/sqlnet.ora<<EOF
 WALLET_LOCATION = (SOURCE = (METHOD = FILE)(METHOD_DATA =(DIRECTORY = /tmp/wallet)))
