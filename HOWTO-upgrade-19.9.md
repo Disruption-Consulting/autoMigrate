@@ -4,13 +4,15 @@ V19 is the current terminal release of Oracle Database, providing Premier suppor
 
 See "My Oracle Support" (MOS) Doc ID 742060.1 for the most up-to-date release information.
 
+To upgrade existing V19 ORACLE_HOME and database(s) see https://mikedietrichde.com/2020/10/22/patching-all-my-environments-with-the-october-2020-patch-bundles/
+
 PROCESS OVERVIEW
 ----------------
 1. Download Oracle v19 software from MOS
 2. Create new v19 home directory and unzip downloaded v19 zip file
 3. Download latest OPatch utility and replace in v19 home
-4. Download 19.8 patchset and install (this is the latest patchset issued July 2020)
-5. Create a v19.8 Container Database (CDB) with "dbca" from the new Oracle home
+4. Download 19.9 patchset and install (this is the latest patchset issued October 2020)
+5. Create a v19.9 Container Database (CDB) with "dbca" from the new Oracle home
 
 
 1. Download software packages from MOS
@@ -21,7 +23,7 @@ a) LINUX.X64_193000_db_home.zip - https://www.oracle.com/database/technologies/o
 
 b) Opatch utility - 6880880 - https://support.oracle.com
 
-c) Release Update - 31281355 - https://support.oracle.com
+c) Release Update - 31771877 - https://support.oracle.com
 
 You also need an install response file (e.g. "db_install.rsp" in this Git repository)
 
@@ -76,13 +78,13 @@ opatch version
 Version should return "OPatch Version: 12.2.0.1.21"
 
 
-4. Upgrade to v19.8
+4. Upgrade to v19.9
 -------------------
 ```
 cd /tmp
-unzip p_190000_Linux-x86-64.zip
-cd /tmp/31281355
-opatch apply
+unzip p31771877_190000_Linux-x86-64.zip
+cd /tmp/31771877
+$ORACLE_HOME/OPatch/opatch apply
 ```
 
 Answer "yes" when prompted and wait until returns "OPatch succeeded".
