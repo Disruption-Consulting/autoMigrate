@@ -25,7 +25,7 @@ Many organizations that have moved from NON-CDB to CDB have seen massive benefit
 
 For example, if your organization runs its Oracle version 12.1.0.2 databases with the OLAP, Partitioning and Diagnostics Pack on infrastructure powered by say, 100 CPU cores (Intel) then its annual support costs are:
 
-|Annual Support Cost|19C|18C|12.1.0.2|11.2.0.4|10.2.0.5|
+|<br>GA|19C<br>2019|18C<br>2018|12.1.0.2|11.2.0.4|10.2.0.5|
 |:---:|:--:|:--:|:--:|:--:|:--:|
 |2020|256K|264K|383K|434K|439K|
 |2021|266K|274K|396K|449K|457K|
