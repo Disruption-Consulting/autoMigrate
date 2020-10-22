@@ -25,20 +25,20 @@ Many organizations that have moved from NON-CDB to CDB have seen massive benefit
 
 For example, if your organization runs its Oracle version 12.1.0.2 databases with the OLAP, Partitioning and Diagnostics Pack on infrastructure powered by say, 100 CPU cores (Intel) then its annual support costs are:
 
-|Annual Support Cost|19C|18C|12.1.0.2|11.2.0.4|10.2.0.5
+|Annual Support Cost|19C|18C|12.1.0.2|11.2.0.4|10.2.0.5|
 |:---:|:--:|:--:|:--:|:--:|
-|2020|256K|264K|383K|434K|439K
-|2021|266K|274K|396K|449K|457K
-|2022|277K|285K|384K|464K|475K
-|2023|288K|297K|362K|425K|494K
-|2024|319K|309K|377K|436K|514K
-|2025|360K|321K|392K|454K|534K
-|2026|382K|334K|407K|472K|556K
-|2027|357K|347K|424K|491K|578K
-|2028|351K|361K|441K|510K|601K
-|2029|365K|375K|458K|531K|625K
-|2030|379K|390K|477K|552K|650K
-|TOTAL PERIOD:|3600K|3557K|4499K|5217K|5923K
+|2020|256K|264K|383K|434K|439K|
+|2021|266K|274K|396K|449K|457K|
+|2022|277K|285K|384K|464K|475K|
+|2023|288K|297K|362K|425K|494K|
+|2024|319K|309K|377K|436K|514K|
+|2025|360K|321K|392K|454K|534K|
+|2026|382K|334K|407K|472K|556K|
+|2027|357K|347K|424K|491K|578K|
+|2028|351K|361K|441K|510K|601K|
+|2029|365K|375K|458K|531K|625K|
+|2030|379K|390K|477K|552K|650K|
+|TOTAL PERIOD:|3600K|3557K|4499K|5217K|5923K|
 
 
 Beyond , there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. 
