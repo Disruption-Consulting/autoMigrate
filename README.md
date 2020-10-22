@@ -42,12 +42,14 @@ For a modest 24-core (Intel) server, the support costs over the next 10 years of
 
 Note that these USD figures do not include any discount, nor do they reflect any Extended support costs. The steady annual increase results from Oracle's indexation rule whereby all licensed products are subject to a year-on-year 4% increase; remaining on version 12.1.0.2, for example, would see annual support costs climbing from 322K to 477K over the next 10 years. Premier support for 12.1.0.2, however, ended in 2018, after which it fell into Sustaining support unless the client agreed to pay a fixed penalty over typically a 3 year period to extend Premier support. What the figures do not show is that Sustaining support does **NOT** include new security patches or bug fixes; all you get is access to technical support and patches that were available during the Premier support period. 
 
-By upgrading to 19C, however, the client would have access to the full range of cover provided by Premier support until the end of 2024 for a total support cost of 1.387M USD over the 5 year period. Remaining on 12.1.0.2 would cost 
-,  compared to 1.744M USD for only  Sustaining support on 12.1.0.2
+By upgrading to 19C, however, the client would have access to the full range of cover provided by Premier support until the end of 2024 for a total support cost that is 26% less than if they were to remain on 12.1.0.2; more importantly, the client's business systems running on 12.1.0.2 would *NOT* be protected during this period from new software security breaches. 
+
+Full details of what is included in the various support levels are published at https://www.oracle.com/us/assets/lifetime-support-technology-069183.pdf
 
 
+In addition to reducing support costs, upgrading to 19C provides the opportunity to signicantly reduce infrastructure costs. It is certainly possible, with good planning, to obtain the same or even greater overall performance on much reduced infrastructure since the Multitenant architecture is predicated on sharing computer resources. For example, 3 database instances running on 12.1.0.2 each consuming 10GB RAM and 90 background processes could be combined into a single CDB running on 19C - resulting in 67% less processes and perhaps, 50% less RAM.
 
-Beyond , there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. 
+
 
 The "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved in such projects. These include:
 
