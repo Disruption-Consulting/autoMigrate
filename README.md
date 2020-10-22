@@ -18,27 +18,33 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, many more Oracle customers are facing something of a rush to get their database farms upgraded before it's too late (see diagram below). 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, many more are dragging their heels even though there is a considerable cost benefit to upgrading.
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
 
-For example, if your organization runs its Oracle version 12.1.0.2 databases with the OLAP, Partitioning and Diagnostics Pack on infrastructure powered by say, 100 CPU cores (Intel) then its annual support costs are:
+For a modest 24-core (Intel) server, the support costs over the next 10 years of Oracle Enterprise Edition together with the Partitioning, OLAP, Diagnostic and Tuning Packs running on the last terminal patch releases can be summarized as:
 
-|<br>Release Date:|19C<br>`(Apr 2019)`|18C<br>`Jul 2018`|12.1.0.2<br>Jun 2013|11.2.0.4<br>Sep 2009|10.2.0.5<br>Jul 2005|
+|<br>`Release Date:`|19C<br>`Apr 2019`|18C<br>`Jul 2018`|12.1.0.2<br>`Jun 2013`|11.2.0.4<br>`Sep 2009`|10.2.0.5<br>`Jul 2005`|
 |:---:|:--:|:--:|:--:|:--:|:--:|
-|2020|256K|264K|383K|434K|439K|
-|2021|266K|274K|396K|449K|457K|
-|2022|277K|285K|384K|464K|475K|
-|2023|288K|297K|362K|425K|494K|
-|2024|319K|309K|377K|436K|514K|
-|2025|360K|321K|392K|454K|534K|
-|2026|382K|334K|407K|472K|556K|
-|2027|357K|347K|424K|491K|578K|
+|2020|256K|264K|322K|373K|439K|
+|2021|266K|274K|335K|388K|457K|
+|2022|277K|285K|348K|403K|475K|
+|2023|288K|297K|362K|420K|494K|
+|2024|300K|309K|377K|436K|514K|
+|2025|312K|321K|392K|454K|534K|
+|2026|324K|334K|407K|472K|556K|
+|2027|337K|347K|424K|491K|578K|
 |2028|351K|361K|441K|510K|601K|
 |2029|365K|375K|458K|531K|625K|
 |2030|379K|390K|477K|552K|650K|
-|TOTAL PERIOD:|3600K|3557K|4499K|5217K|5923K|
+|TOTAL PERIOD:|3454K|3557K|4342K|5030K|5923K|
+
+Note that these USD figures do not include any discount, nor do they reflect any Extended support costs. The steady annual increase results from Oracle's indexation rule whereby all licensed products are subject to a year-on-year 4% increase; remaining on version 12.1.0.2, for example, would see annual support costs climbing from 322K to 477K over the next 10 years. Premier support for 12.1.0.2, however, ended in 2018, after which it fell into Sustaining support unless the client agreed to pay a fixed penalty over typically a 3 year period to extend Premier support. What the figures do not show is that Sustaining support does **NOT** include new security patches or bug fixes; all you get is access to technical support and patches that were available during the Premier support period. 
+
+By upgrading to 19C, however, the client would have access to the full range of cover provided by Premier support until the end of 2024 for a total support cost of 1.387M USD over the 5 year period. Remaining on 12.1.0.2 would cost 
+,  compared to 1.744M USD for only  Sustaining support on 12.1.0.2
+
 
 
 Beyond , there is very often a strong business motivation to change infrastructure at the same time, for example, moving from on-premise to cloud, or moving from AIX to LINUX, or outsourcing or simply upgrading the on-premise hardware. This then becomes a "migration" project rather than an "upgrade" in place, since the business data must be physically moved. 
