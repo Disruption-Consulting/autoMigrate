@@ -4,13 +4,14 @@ Utility to consistently migrate NON-CDB Oracle databases to PDB at minimal cost 
 - uses features only included in the basic Enterprise Edition software license
 - reduces application downtime to a minimum
 - source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
-- target database versions 19.3 through 19.8 (CDB)
+- target database versions 19.3 through 19.9 (CDB)
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). A single SGA and set of background processes for the CDB are shared by up to 252 PDBs, which can have a transformative effect on an organization's I.T. spend whilst greatly improving its business responsiveness.
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). The literature refers to the pre-Multitenant database as a NON-CDB, in which a set of application tablespaces is typically managed through a single dedicated instance and related background processes. By contrast, a CDB can "contain" up to 252 independent sets of application tablespaces (PDBs) which it manages through a single instance and set of background processes. In this way, migrating to Multitenant can potentially transform an I.T. organisation's costs and greatly improve its efficiency. The Mulitenant option is zero-cost up to 3 PDBs per version 19 CDB (otherwise the cost is 3850 USD / year / Processor).
+
 
 # OVERVIEW
 
-Migrating or even upgrading Oracle database can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
+Upgrading to a new Oracle database version can incur significant cost and disruption, which is why many organizations avoid it for as long as possible. However, at the time of writing (2020) there are several factors that make it increasingly incumbent on Oracle customers to migrate now:
 
 - version 19 offers Premier and Extended support until April 2024 and April 2027 respectively
 - all earlier version databases are fast reaching end-of-life incurring significant extra support costs
@@ -18,10 +19,14 @@ Migrating or even upgrading Oracle database can incur significant cost and disru
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, many more are dragging their heels even though there is a considerable cost benefit to upgrading.
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, in many cases, a change of this magnitude is ofter regarded as a complex undertaking that incurs considerable risk and disruption, at not inconsiderable cost. 
+
+The aim of the "autoMigrate" utility is to reduce the migration effort and delay to a minimum, whilst offering a much improved mechanism for migrating large databases with minimal downtime.
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
+
+# FINANCIAL MOTIVATION
 
 For a modest 24-core (Intel) server, the support costs over the next 10 years of Oracle Enterprise Edition together with the Partitioning, OLAP, Diagnostic and Tuning Packs running on the last terminal patch releases can be summarized as:
 
@@ -49,7 +54,7 @@ Full details of what is included in the various support levels are published at 
 
 In addition to reducing support costs, upgrading to 19C provides the opportunity to signicantly reduce infrastructure costs. It is certainly possible, with good planning, to obtain the same or even greater overall performance on much reduced infrastructure since the Multitenant architecture is predicated on sharing computer resources. For example, 3 database instances running on 12.1.0.2 each consuming 10GB RAM and 90 background processes could be combined into a single CDB running on 19C - resulting in 67% less processes and perhaps, 50% less RAM.
 
-
+# AUTOMIGATE UTILITY
 
 The "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved in such projects. These include:
 
