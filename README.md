@@ -15,7 +15,7 @@ Upgrading to a new Oracle database version can incur significant cost and disrup
 
 - version 19 offers Premier and Extended support until April 2024 and April 2027 respectively
 - all earlier version databases are fast reaching end-of-life incurring significant extra support costs
-- NON-CDB is deprecated as of version 20
+- NON-CDB is no longer available as of version 20 having been deprecated since release 12.1
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
@@ -28,7 +28,7 @@ The aim of the "autoMigrate" utility is to reduce the migration effort and delay
 
 # FINANCIAL MOTIVATION
 
-For a modest 24-core (Intel) server, the support costs over the next 10 years of Oracle Enterprise Edition together with the Partitioning, OLAP, Diagnostic and Tuning Packs running on the last terminal patch releases can be summarized as:
+By way of example, the support costs over the next 10 years of running Oracle Enterprise Edition together with the Partitioning, OLAP, Diagnostic and Tuning Packs on a modest 24-core (Intel) server can be summarized as (all figures in USD, no discount applied):
 
 |<br>`Release Date:`|19C<br>`Apr 2019`|18C<br>`Jul 2018`|12.1.0.2<br>`Jun 2013`|11.2.0.4<br>`Sep 2009`|10.2.0.5<br>`Jul 2005`|
 |:---:|:--:|:--:|:--:|:--:|:--:|
@@ -45,30 +45,35 @@ For a modest 24-core (Intel) server, the support costs over the next 10 years of
 |2030|379K|390K|477K|552K|650K|
 |TOTAL PERIOD:|3454K|3557K|4342K|5030K|5923K|
 
-Note that these USD figures do not include any discount, nor do they reflect any Extended support costs. The steady annual increase results from Oracle's indexation rule whereby all licensed products are subject to a year-on-year 4% increase; remaining on version 12.1.0.2, for example, would see annual support costs climbing from 322K to 477K over the next 10 years. Premier support for 12.1.0.2, however, ended in 2018, after which it fell into Sustaining support unless the client agreed to pay a fixed penalty over typically a 3 year period to extend Premier support. What the figures do not show is that Sustaining support does **NOT** include new security patches or bug fixes; all you get is access to technical support and patches that were available during the Premier support period. 
+The steady annual increase results from Oracle's indexation rule whereby all licensed products are subject to a year-on-year 4% increase; remaining on version 12.1.0.2, for example, would see annual support costs climbing from 322K to 477K over the next 10 years. Premier support for 12.1.0.2, however, ended in 2018, after which it fell into Sustaining support unless the client agreed to pay a fixed penalty over typically a 3 year period to extend Premier support. What the figures do not show is that Sustaining support does **NOT** include new security patches or bug fixes; your databases would effectively be running unprotected from any new security breaches.
 
-By upgrading to 19C, however, the client would have access to the full range of cover provided by Premier support until the end of 2024 for a total support cost that is 26% less than if they were to remain on 12.1.0.2; more importantly, the client's business systems running on 12.1.0.2 would *NOT* be protected during this period from new software security breaches. 
+By upgrading to 19C, however, you would have access to the full range of cover provided by Premier support until the end of 2024 for a total support cost that is 26% less than if you remained on 12.1.0.2 for the same period. So why would you **NOT** upgrade if it costs 26% **LESS** to have your databases fully protected on fully-supported software?
 
 Full details of what is included in the various support levels are published at https://www.oracle.com/us/assets/lifetime-support-technology-069183.pdf
 
 
-In addition to reducing support costs, upgrading to 19C provides the opportunity to signicantly reduce infrastructure costs. It is certainly possible, with good planning, to obtain the same or even greater overall performance on much reduced infrastructure since the Multitenant architecture is predicated on sharing computer resources. For example, 3 database instances running on 12.1.0.2 each consuming 10GB RAM and 90 background processes could be combined into a single CDB running on 19C - resulting in 67% less processes and perhaps, 50% less RAM.
+In addition to reducing support costs, upgrading to 19C provides an opportunity to signicantly reduce infrastructure costs. It is certainly possible, with good planning, to obtain the same or even greater overall performance on much reduced infrastructure since the Multitenant architecture is predicated on sharing computer resources. As commercial software moves increasingly to a core-based cost model it becomes ever more important to run applications on right-sized infrastructure.
 
 # AUTOMIGATE UTILITY
 
-The "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved in such projects. These include:
+To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration fixup tasks.
+
+Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated.
+
+By adopting a scripted approach, each migration is carried out consistently with a minimum of intervention and a maximum of control; this includes the following tasks:
 
 - data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
-- copying metadata definitions from source to target 
-- reconciling transferred data and metadata
+- integrating metadata definitions into the target 
+- reconciling both transferred data and metadata
 - gathering accurate statistics of transferred data objects
-- confirming use of any DIRECTORY objects in source that may need to be reconfigured in target
+- migrating any version 11 Access control entries
+- confirming use of any DIRECTORY objects in source that need to be present in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
 - ensuring grants of any SYS-owned source objects to application schemas are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. Oracle's response to this is either use its separately licensed Golden Gate option or wrestle with its approximate 7000 line Perl script which requires maintaining configuration files on both source and target servers.
+One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
