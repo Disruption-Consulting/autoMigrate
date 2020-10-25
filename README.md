@@ -79,7 +79,7 @@ Migration by Datapump requires that the target PDB is pre-created from PDB$SEED 
 - ensuring grants on any SYS-owned source objects to application schemas/users are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-Migration a 500GB database running on 11.2.0.4 on AIX over a network supporting 100 GB/hour bandwidth to target 19C database running on RHEL would involve:
+A recent migration of a 500GB NONCDB database running on 11.2.0.4 on AIX over a network supporting 100 GB/hour bandwidth to a target 19C PDB database running on Red Hat Enterprise Linux involved:
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
@@ -92,26 +92,19 @@ Migration a 500GB database running on 11.2.0.4 on AIX over a network supporting 
 |:no_entry:|TOTAL **5 hours 12 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. 
-
-Migration involves first running the provided "src_migr" script on the NON-CDB source database; `mode=EXECUTE` sets all application tablespaces to read only which takes at most a few minutes depending on how many 'dirtied' blocks need to be written from the buffer cache and how many application tablespaces are involved. The provided "tgt_migr" script is then run on the target database which:
-1) creates a PDB to receive the NON-CDB
-2) transfers the read only data files from the NON-CDB to the PDB
-3) runs DATATPUMP to plug the data files into the PDB and integrate application objects like Users, PLSQL, Views, Sequences etc.
-
-The application is effectively unavailable until the migration completes. Depending on the business criticality of the application, 11 hours downtime, as in this example, may be acceptable. In many other cases, however, a much shorter period of downtime will be necessary. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental data file backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database.
+In this case, the client's business could afford the approximate 5 hours application downtime, which starts unavoidably as soon as the source database application tablespaces are set to read only. In cases where the database is critical to business operations, a much shorter period of downtime will be required. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database.
 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:white_check_mark:||`./runMigration -m INCR`||
-|:white_check_mark:||**BACKUP LVL=0**|`sqlplus @tgt_migr`|
+|:white_check_mark:||`./runMigration -i`||
+|:white_check_mark:||**BACKUP LVL=0**|`./runMigration`|
 |:white_check_mark:||**BACKUP LVL=1**|**CREATE PDB**|
 |:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=0**|
 |:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=1 & ROLL FORWARD**|
 |:white_check_mark:||:repeat:|:repeat:|
-|:white_check_mark:|TOTAL: **13 hours**|||
+|:white_check_mark:|TOTAL: **5 hours**|||
 |:no_entry:||`./runMigration -m EXECUTE`||
 |:no_entry:|5 mins|**BACKUP LVL=1**||
 |:no_entry:|5 mins||**TRANSFER LVL=1 & ROLL FORWARD**|
