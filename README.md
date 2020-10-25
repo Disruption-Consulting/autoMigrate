@@ -58,9 +58,15 @@ In addition to reducing support costs, upgrading to 19C provides an opportunity 
 
 To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration fixup tasks.
 
-Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated.
+Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated. Adopting a scripted approach, however, ensures each migration is carried out consistently with a minimum of intervention and a maximum of control. 
 
-By adopting a scripted approach, each migration is carried out consistently with a minimum of intervention and a maximum of control; this includes the following tasks:
+There are 3 common methods for migrating NON-CDB to PDB: 1) Datapump 2) Clone/Upgrade/Convert and 3) Golden Gate
+
+Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is complex to configure but enables near zero down-time migration; to minimise costs and maintain a simple solution we do not consider this technique as part of a generic migration solution. Moreover, autoMigrate includes a mode of operation for minimizing downtime using functionality that is part of the basic software license. Whilst not near-zero, this will provide in most cases an acceptable solution.
+
+Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; depending on the complexity of the NONCDB, the upgrade and conversion steps can take a very long time to complete. 
+
+Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion. It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which, of course, was the main motivation behind automating those tasks within a single script, including:
 
 - data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
@@ -70,21 +76,23 @@ By adopting a scripted approach, each migration is carried out consistently with
 - migrating any version 11 Access control entries
 - confirming use of any DIRECTORY objects in source that need to be present in target
 - confirming use of any DATABASE LINK objects that may need to be configured for use in target
-- ensuring grants of any SYS-owned source objects to application schemas are replayed in the target database
+- ensuring grants on any SYS-owned source objects to application schemas/users are replayed in the target database
 - ensuring tablespaces are set to their pre-migration status on completion
 
-One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. 
+Migration a 500GB database running on 11.2.0.4 on AIX over a network supporting 100 GB/hour bandwidth to target 19C database running on RHEL would involve:
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:no_entry:|5 mins|`./runMigration -m EXECUTE`||
+|:no_entry:|1 minute|`./runMigration -m EXECUTE`||
 |:no_entry:|||`./runMigration -c CRED -t TNS -p PDB`|
-|:no_entry:|5 mins||**CREATE PDB**|
-|:no_entry:|11 hours||**TRANSFER DATA**|
-|:no_entry:|50 mins||**RUN DATAPUMP**|
-|:no_entry:|TOTAL **12 hours**|||
+|:no_entry:|1 minute||**CREATE PDB**|
+|:no_entry:|5 hours||**TRANSFER DATA**|
+|:no_entry:|10 minutes||**RUN DATAPUMP**|
+|:no_entry:|TOTAL **5 hours 12 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
+
+One of the most challenging aspects of database migration is keeping application downtime to a minimum. For example, assuming an effective network bandwith of 100 GB/hour, migrating a 1 TB database of medium complexity might take 10 hours to migrate the data with 1 additional hour to integrate the metadata using Oracle's Datapump utility. 
 
 Migration involves first running the provided "src_migr" script on the NON-CDB source database; `mode=EXECUTE` sets all application tablespaces to read only which takes at most a few minutes depending on how many 'dirtied' blocks need to be written from the buffer cache and how many application tablespaces are involved. The provided "tgt_migr" script is then run on the target database which:
 1) creates a PDB to receive the NON-CDB
