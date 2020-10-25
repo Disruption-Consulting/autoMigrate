@@ -84,15 +84,15 @@ A recent migration of a 500GB NONCDB database running on 11.2.0.4 on AIX over a 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:no_entry:|1 minute|`./runMigration.sh`||
-|:no_entry:|||`./runMigration.sh`|
+|:no_entry:|1 minute|`./runMigration`||
+|:no_entry:|||`./runMigration`|
 |:no_entry:|1 minute||**CREATE PDB**|
 |:no_entry:|5 hours||**TRANSFER DATA**|
 |:no_entry:|10 minutes||**RUN DATAPUMP**|
 |:no_entry:|TOTAL **5 hours 12 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-In this case, the client's business could afford the approximate 5 hours application downtime, which starts unavoidably as soon as the source database application tablespaces are set to read only. In cases where the database is critical to business operations, a much shorter period of downtime will be required. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database.
+In this case, the client's business could afford the approximate 5 hours application downtime, which starts unavoidably as soon as the source database application tablespaces are set to read only. In cases where the database is critical to business operations, a much shorter period of downtime will be required. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database. The same 500GB database could have been migrated using this method as follows:
 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
@@ -100,25 +100,19 @@ In this case, the client's business could afford the approximate 5 hours applica
 |:white_check_mark:||**START MIGRATION**||
 |:white_check_mark:||`./runMigration -i`||
 |:white_check_mark:||**BACKUP LVL=0**|`./runMigration`|
-|:white_check_mark:||**BACKUP LVL=1**|**CREATE PDB**|
-|:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=0**|
-|:white_check_mark:||**BACKUP LVL=1**|**TRANSFER LVL=1 & ROLL FORWARD**|
-|:white_check_mark:||:repeat:|:repeat:|
-|:white_check_mark:|TOTAL: **5 hours**|||
+|:white_check_mark:|||**CREATE PDB**|
+|:white_check_mark:||**TRANSFER LVL=0**|
+|:white_check_mark:||**BACKUP LVL=1** :repeat:|**TRANSFER LVL=1 & ROLL FORWARD** :repeat:|
+|:white_check_mark:|TOTAL: **24 hours**|||
 |:no_entry:||`./runMigration -m EXECUTE`||
-|:no_entry:|5 mins|**BACKUP LVL=1**||
-|:no_entry:|5 mins||**TRANSFER LVL=1 & ROLL FORWARD**|
-|:no_entry:|50 mins||**RUN DATAPUMP**|
-|:no_entry:|TOTAL: **1 hour**|||
+|:no_entry:|1 minute|**BACKUP LVL=1 FINAL**||
+|:no_entry:|1 minute||**TRANSFER LVL=1 & ROLL FORWARD FINAL**|
+|:no_entry:|10 mins||**RUN DATAPUMP**|
+|:no_entry:|TOTAL: **12 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-Migration by this method requires starting with `sqlplus @src_migr mode=INCR`, which creates a background job running at user-defined intervals creating at first file image copies (Level=0 incremental backup) of each application tablespace data file. Once this is started, `sqlplus @tgt_migr` on the target automatically recognises that the source is creating backups and creates a background job runnning at the same frquency to transfer these to the destination PDB file system. Once file image backup copies have been taken, the source database job starts taking Level=1 incremental backups of any changes since the last backup which the target database job uses to roll forward its local file image copies. 
 
-In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `sqlplus @src_migr mode=EXECUTE`; from that point forward the migration proceeds in identical fashion since the only criterion for starting the DATAPUMP integration job is that all data files are read only. In this example, the same volume of data is migrated with 1 hour of application downtime compared to 12 hours. 
-
-autoMigrate runs the optimal database migration for the source database version - i.e. for version >= 11.2.0.3 this is Full Transportable Database, for version >= 10.1.0.3 and < 11.2.0.3 this is Transportable Tablespace. The important difference is that Transportable Database migrates both Data and Metadata in a single invocation of the datapump utility, whereas Transportable Tablespace (TTS)is a more complex process requiring 3 separate datapump runs - Users/Data/Metadata.
-
-N.b. the 10.1.0.3 limitation applies only to cross-platform migrations. Where source and targets have the same endianness, even a version 8 database can be migrated using TTS.
+In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `./runMigration -m EXECUTE`; from that point forward the migration proceeds in exactly the same way resulting in only 12 minutes application downtime.   
  
 
 # AUTOMIGRATE SCRIPTS
@@ -126,21 +120,19 @@ The migration scripts are included in "autoMigrate.zip" within this repository.
 
 The same script "runMigration.sh" runs on both both SOURCE and TARGET database servers. 
 
-When it runs on database server where ORACLE_SID points to version 19 then it processes as a TARGET database; otherwise it processes as a SOURCE database.
+When it runs on a CDB database then it processes as a TARGET database; otherwise it processes as a SOURCE database.
 
 ## START MIGRATION ON SOURCE
 
 Logon to SOURCE server as "oracle" software owner or any account belonging to the "dba" group.
 
-Source the database to be migrated before running the migration script (i.e. ORACLE_HOME and ORACLE_SID)
-
-Run the migration script in "ANALYZE" mode to report on relevant migration details, e.g. database size, version, server platform.
+Run the migration script in default "ANALYZE" mode to report on relevant migration details, e.g. database size, version, server platform, log mode.
 
 ```
-./runMigration.sh -m ANALYZE
+./runMigration.sh -m ANALYZE -o ORACLE_SID
 ```
 
-- installs the migration schema (default name is MIGRATION19)
+- installs the migration schema (default name is MIGRATION19) in the database identified by ORACLE_SID in the "-o" argument
 - analyzes the subject database reporting on details relevant to the migration
 
 ```
@@ -148,26 +140,24 @@ Run the migration script in "ANALYZE" mode to report on relevant migration detai
 ```
 
 - sets all application tablespaces to read only
-- display the command to run on the TARGET server which will complete the migration
+- outputs the command to be run on the TARGET server
 
 
 ## COMPLETE MIGRATION ON TARGET
 
 Logon to target server as "oracle" software owner or any account belonging to the "dba" OS group.
 
-Source the pre-created target CDB, i.e. setting ORACLE_HOME and ORACLE_SID.
-
-Copy/paste the command displayed after running the script on the SOURCE server, e.g.
+Copy/paste the command output after running the script on the SOURCE server, e.g.
 
 ```
-./runMigration.sh -c MIGRATION19/'"hmN_a1a0~Y"' -t 172.17.0.3:1521/orcl -p PDB1
+./runMigration.sh -c MIGRATION19/'"hmN_a1a0~Y"' -t 172.17.0.3:1521/orcl -p DBNAME
 ```
 
-- creates the target PDB 
-- creates PDBADMIN schema within PDB 
-- creates dblink using above details within the PDB
-- transfers data files from SOURCE to TARGET
-- runs DATAPUMP to integrate the data files, copy metadata and perform post-migration tasks.
+- creates the target PDB named according to "-p" argument (will be the DB_NAME of source database)
+- creates PDBADMIN schema within the PDB 
+- creates dblink using credentials specified in the "-c" argument and TNS location specified in the "-t" argument
+- transfers application tablespace data files from SOURCE to TARGET
+- runs DATAPUMP with NETWORK_LINK option to integrate the data files, copy metadata and perform post-migration tasks.
 
 
 ## REFERENCES 
