@@ -66,7 +66,7 @@ Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is c
 
 Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; depending on the complexity of the NONCDB, the upgrade and conversion steps can take a very long time to complete. 
 
-Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion. It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which, of course, was the main motivation behind automating those tasks within a single script, including:
+Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion. It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which, of course, was the main motivation behind automating those tasks within a single script and include:
 
 - data transport that is restartable in the event of network or systems failure
 - ensuring endianess compatibility of source and target data
@@ -84,8 +84,8 @@ Migration a 500GB database running on 11.2.0.4 on AIX over a network supporting 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:no_entry:|1 minute|`./runMigration -m EXECUTE`||
-|:no_entry:|||`./runMigration -c CRED -t TNS -p PDB`|
+|:no_entry:|1 minute|`./runMigration.sh`||
+|:no_entry:|||`./runMigration.sh`|
 |:no_entry:|1 minute||**CREATE PDB**|
 |:no_entry:|5 hours||**TRANSFER DATA**|
 |:no_entry:|10 minutes||**RUN DATAPUMP**|
