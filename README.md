@@ -101,7 +101,7 @@ In this case, the client's business could afford the approximate 5 hours applica
 |:white_check_mark:||`./runMigration -i`||
 |:white_check_mark:||**BACKUP LVL=0**|`./runMigration`|
 |:white_check_mark:|||**CREATE PDB**|
-|:white_check_mark:||**TRANSFER LVL=0**|
+|:white_check_mark:|||**TRANSFER LVL=0**|
 |:white_check_mark:||**BACKUP LVL=1** :repeat:|**TRANSFER LVL=1 & ROLL FORWARD** :repeat:|
 |:white_check_mark:|TOTAL: **24 hours**|||
 |:no_entry:||`./runMigration -m EXECUTE`||
@@ -112,7 +112,7 @@ In this case, the client's business could afford the approximate 5 hours applica
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
 
-In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `./runMigration -m EXECUTE`; from that point forward the migration proceeds in exactly the same way resulting in only 12 minutes application downtime.   
+In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `./runMigration -m EXECUTE` at which point the application tablespaces are set read only before a final incremental backup is taken and applied. From there the migration proceeds in exactly the same way resulting in only 12 minutes application downtime.   
  
 
 # AUTOMIGRATE SCRIPTS
