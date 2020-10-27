@@ -1,12 +1,12 @@
 # automigrate
-Utility to consistently migrate NON-CDB Oracle databases to PDB at minimal cost and delay.
+Utility to consistently migrate NON-CDB Oracle databases to PDB with minimal cost and delay.
 
 - uses features only included in the basic Enterprise Edition software license
 - reduces application downtime to a minimum
-- source database versions 10.1, 10.2, 11.2, 12.1, 12.2, 18.3 (NON-CDB)
-- target database versions 19.3 through 19.9 (CDB)
+- source database versions >  10.1.0.2
+- target database versions >= 19.9
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). The literature refers to the pre-Multitenant database as a NON-CDB, in which a set of application tablespaces is typically managed through a single dedicated instance and related background processes. By contrast, a CDB can "contain" up to 252 independent sets of application tablespaces (PDBs) which it manages through a single instance and set of background processes. In this way, migrating to Multitenant can potentially transform an I.T. organisation's costs and greatly improve its efficiency. The Mulitenant option is zero-cost up to 3 PDBs per version 19 CDB (otherwise the cost is 3850 USD / year / Processor).
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). The literature refers to the pre-Multitenant database as a NON-CDB, in which a set of application tablespaces is typically managed through a single dedicated instance and related background processes. By contrast, a CDB can "contain" up to 252 independent sets of application tablespaces (PDBs) which it manages through a single instance and set of background processes. In this way, migrating to Multitenant can potentially transform an I.T. organisation's costs and improve efficiency by an order of magnitude. Up to 3 PDBs per version 19 CDB is cost-free - otherwise the full Multitenant option is 3850 USD / year / Processor.
 
 
 # OVERVIEW
@@ -19,9 +19,9 @@ Upgrading to a new Oracle database version can incur significant cost and disrup
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, in many cases, a change of this magnitude is ofter regarded as a complex undertaking that incurs considerable risk and disruption, at not inconsiderable cost. 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, in many cases, a change of this magnitude is considered a complex, costly undertaking that incurs considerable risk and disruption. 
 
-The aim of the "autoMigrate" utility is to reduce the migration effort and delay to a minimum, whilst offering a much improved mechanism for migrating large databases with minimal downtime.
+The aim of the "autoMigrate" utility is to simplify the migration effort by providing an adaptable framework that automates the many tasks involved in database migration and thereby mimimize the overall cost and delay.
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
@@ -56,17 +56,17 @@ In addition to reducing support costs, upgrading to 19C provides an opportunity 
 
 # AUTOMIGATE UTILITY
 
-To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration fixup tasks.
+To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration tasks.
 
 Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated. Adopting a scripted approach, however, ensures each migration is carried out consistently with a minimum of intervention and a maximum of control. 
 
-There are 3 principal methods for migrating NON-CDB to PDB: 1) Golden Gate, 2) Clone/Upgrade/Convert and 3)Datapump 
+There are 3 principal methods for migrating NON-CDB to PDB: 1) Golden Gate, 2) Clone/Upgrade/Convert and 3) Datapump 
 
-1) Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is complex to configure but enables near zero down-time migration; to minimise cost of ownership and maintain simplicity we do not consider this technique as part of a generic migration solution. Moreover, autoMigrate includes a mode of operation for minimizing downtime using functionality that is already part of the basic software license, which will provide in most cases an acceptable solution at zero additional cost.
+1) Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is complex to configure but enables near zero down-time migration; to minimise cost of ownership and maintain simplicity we do not consider this technique as part of a generic, least-cost migration solution. Moreover, autoMigrate includes a mode of operation for minimizing downtime using functionality that is already part of the basic software license, which will provide in most cases an acceptable solution.
 
-2) Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; in cases where migration implies an upgrade, e.g. migrating 12.1.0.2 to 19C, the source dictionary once cloned has to be upgraded which takes at least 20 minutes on the fastest platforms, before being converted into a PDB which can take at least another 10 minutes to complete assuming there are no errors. 
+2) Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; moreover, in cases where migration implies a software upgrade, e.g. migrating 12.1.0.2 to 19C, the source dictionary once cloned has to be upgraded which takes at least 20 minutes on the fastest platforms, before being converted into a PDB which can take at least another 10 minutes assuming there are no errors. 
 
-3) Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion in method 2). It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which is true and was the main motivation behind automating those tasks within a single script. Hence, we only need to run runMigration.sh once on the source and once on the target to complete a migration.
+3) Migration by Datapump requires that the target PDB is pre-created which takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion in method 2). It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which is true and was the main motivation behind automating those tasks within a single script. Hence, we only need to run runMigration.sh once on the source and once on the target to complete a migration.
 
 "runMigration.sh" does the following:
 
