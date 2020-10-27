@@ -60,26 +60,31 @@ To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adapt
 
 Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated. Adopting a scripted approach, however, ensures each migration is carried out consistently with a minimum of intervention and a maximum of control. 
 
-There are 3 common methods for migrating NON-CDB to PDB: 1) Datapump 2) Clone/Upgrade/Convert and 3) Golden Gate
+There are 3 principal methods for migrating NON-CDB to PDB: 1) Golden Gate, 2) Clone/Upgrade/Convert and 3)Datapump 
 
-Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is complex to configure but enables near zero down-time migration; to minimise costs and maintain a simple solution we do not consider this technique as part of a generic migration solution. Moreover, autoMigrate includes a mode of operation for minimizing downtime using functionality that is part of the basic software license. Whilst not near-zero, this will provide in most cases an acceptable solution.
+1) Golden Gate is a separately licensed option (3850 USD/Processor/Year) which is complex to configure but enables near zero down-time migration; to minimise cost of ownership and maintain simplicity we do not consider this technique as part of a generic migration solution. Moreover, autoMigrate includes a mode of operation for minimizing downtime using functionality that is already part of the basic software license, which will provide in most cases an acceptable solution at zero additional cost.
 
-Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; depending on the complexity of the NONCDB, the upgrade and conversion steps can take a very long time to complete. 
+2) Clone/Upgrade/Convert is only relevant since version 12.1 and only works where the target and source databases share the same endianness; in cases where migration implies an upgrade, e.g. migrating 12.1.0.2 to 19C, the source dictionary once cloned has to be upgraded which takes at least 20 minutes on the fastest platforms, before being converted into a PDB which can take at least another 10 minutes to complete assuming there are no errors. 
 
-Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion. It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which, of course, was the main motivation behind automating those tasks within a single script and include:
+3) Migration by Datapump requires that the target PDB is pre-created from PDB$SEED - this takes only a few seconds to complete, eliminating the long elapsed times required for upgrade and conversion in method 2). It works on all source versions since 10.1.0.2, automatically handles cross-endianness migration and offers a fully integrated mechanism for minimizing application downtime. A common complaint against use of Datapump is that it involves many manual tasks, which is true and was the main motivation behind automating those tasks within a single script. Hence, we only need to run runMigration.sh once on the source and once on the target to complete a migration.
 
-- data transport that is restartable in the event of network or systems failure
-- ensuring endianess compatibility of source and target data
-- integrating metadata definitions into the target 
-- reconciling both transferred data and metadata
-- gathering accurate statistics of transferred data objects
-- migrating any version 11 Access control entries
-- confirming use of any DIRECTORY objects in source that need to be present in target
-- confirming use of any DATABASE LINK objects that may need to be configured for use in target
-- ensuring grants on any SYS-owned source objects to application schemas/users are replayed in the target database
-- ensuring tablespaces are set to their pre-migration status on completion
+"runMigration.sh" does the following:
 
-A recent migration of a 500GB NONCDB database running on 11.2.0.4 on AIX over a network supporting 100 GB/hour bandwidth to a target 19C PDB database running on Red Hat Enterprise Linux involved:
+- creates common user in the target CDB database with least privileges to perform all migration tasks
+- transports data files in a restartable process to save time in the event of network or systems failure
+- ensures any endianess conversion is done automatically by using the dbms_file_transfer utility
+- creates the Pluggable Database 
+- integrates all application metadata into the target by using the Full Transportable Database option of Datapump
+- automatically uses the Transportable Tablespace option if source database version < 11.2.0.3
+- reconciles both transferred data and metadata object counts
+- gathers statistics of the migrated database including dictionary and fixed objects
+- migrates any version 11 Access Control Entries 
+- confirms use of any DIRECTORY objects in source that need to be present in target
+- confirms use of any DATABASE LINK objects that may need to be configured for use in target
+- grants on any SYS-owned source objects to application schemas/users are replayed in the target database
+- ensures application tablespaces are set to their pre-migration status on completion in both source and target databases
+
+A recent migration of a 500GB database running on 11.2.0.4 on AIX over a network supporting 100 GB/hour bandwidth to a target 19C PDB database running on Red Hat Enterprise Linux involved:
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
