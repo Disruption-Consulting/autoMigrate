@@ -19,9 +19,9 @@ Upgrading to a new Oracle database version can incur significant cost and disrup
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
 - version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
 
-Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, in many cases, a change of this magnitude is considered a complex, costly undertaking that incurs considerable risk and disruption. 
+Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, a change of this magnitude is widely considered to be a complex, costly undertaking that incurs considerable risk and disruption. 
 
-The aim of the "autoMigrate" utility is to simplify the migration effort by providing an adaptable framework that automates the many tasks involved in database migration and thereby mimimize the overall cost and delay.
+The aim of the "autoMigrate" utility is to simplify the migration effort by providing an adaptable framework that automates the many tasks involved in database migration and thereby mimimize the overall cost and delay. Failure to migrate always leads to increasing costs and eventually to a situation where support includes neither security patches nor bug fixes. For example, Premier support for 12.1.0.2 ended in June 2018 at which point extending support would have cost a further 10% the following year and a further 20% until June 2022 when this version will fall into Sustaining support - i.e. running without security patches and without error correction whilst still incurring an additional 4% annual support increase.
 
 
 ![MRUpdatedReleaseRoadmap5282020](https://user-images.githubusercontent.com/42802860/90099785-2e6a2400-dd33-11ea-826f-661b58bf3d0b.png)
