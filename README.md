@@ -125,27 +125,27 @@ In this way, near-synchronous copies of the source application data files are ma
 # AUTOMIGRATE SCRIPTS
 The migration scripts are included in "autoMigrate.zip" available in this repository and include:
 
-1. runMigration.sh
-------------------
-Bash shell script that runs on both both SOURCE and TARGET database servers. 
-Determines at run time whether it processes a SOURCE or TARGET database based on the CDB value in V$DATABASE - if YES then TARGET else SOURCE
-Creates external password wallet store to securely maintain all Oracle account passwords used in the migration
-Creates schema "MIGRATION19" if running on SOURCE to act as object of Database Link that is subsequently created on TARGET
-Creates common user "C##MIGRATION" if running on TARGET
-Creates PDB from PDB$SEED when running on TARGET
+## runMigration.sh
+
+- Bash shell script that runs on both both SOURCE and TARGET database servers. 
+- Determines at run time whether it processes a SOURCE or TARGET database based on the CDB value in V$DATABASE - if YES then TARGET else SOURCE
+- Creates external password wallet store to securely maintain all Oracle account passwords used in the migration
+- Creates schema "MIGRATION19" if running on SOURCE to act as object of Database Link that is subsequently created on TARGET
+- Creates common user "C##MIGRATION" if running on TARGET
+- Creates PDB from PDB$SEED when running on TARGET
 
 
-2. pck_migration_src.sql
-------------------------
-PLSQL Package that is compiled on SOURCE server within schema "MIGRATION19"
-Entry points in this package are called by runMigration.sh to:
+## pck_migration_src.sql
+
+- PLSQL Package that is compiled on SOURCE server within schema "MIGRATION19"
+- Entry points in this package are called by runMigration.sh to:
   - report on database properties that are relevant to the migration
   - execute the migration by setting application tablespaces to read only
   - prepare database for taking incremental backups if requested
 
 
-3. pck_migration_cdb.sql
-------------------------
+## pck_migration_cdb.sql
+
 PLSQL Package that is compiled on TARGET server within common user "C##MIGRATION"
 Entry points in this package are called by runMigration.sh to:
   - manage the data file transfer process from SOURCE to TARGET destination directory
