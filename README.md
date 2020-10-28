@@ -128,20 +128,54 @@ The migration scripts are included in "autoMigrate.zip" available in this reposi
 1. runMigration.sh
 ------------------
 Bash shell script that runs on both both SOURCE and TARGET database servers. 
+Determines at run time whether it processes a SOURCE or TARGET database based on the CDB value in V$DATABASE - if YES then TARGET else SOURCE
+Creates external password wallet store to securely maintain all Oracle account passwords used in the migration
+Creates schema "MIGRATION19" if running on SOURCE to act as object of Database Link that is subsequently created on TARGET
+Creates common user "C##MIGRATION" if running on TARGET
+Creates PDB from PDB$SEED when running on TARGET
+
 
 2. pck_migration_src.sql
 ------------------------
-PLSQL Package that is compiled on SOURCE server
+PLSQL Package that is compiled on SOURCE server within schema "MIGRATION19"
+Entry points in this package are called by runMigration.sh to:
+  - report on database properties that are relevant to the migration
+  - execute the migration by setting application tablespaces to read only
+  - prepare database for taking incremental backups if requested
 
-3. 
 
-When it runs on a CDB database then it processes as a TARGET database; otherwise it processes as a SOURCE database.
+3. pck_migration_cdb.sql
+------------------------
+PLSQL Package that is compiled on TARGET server within common user "C##MIGRATION"
+Entry points in this package are called by runMigration.sh to:
+  - manage the data file transfer process from SOURCE to TARGET destination directory
+  - recognize when all application tablespaces have been set read only to trigger datapump phase
+  - automatically apply incremental backup pieces to local level 0 file copies
 
-## START MIGRATION ON SOURCE
+4. pck_migration_pdb.sql
+------------------------
+PLSQL Package that is compiled on TARGET server within the "PDBADMIN" schema that is created with the PDB
+Entry points in this package are called by runMigration.sh to:
+  - generate appropriate parfiles for operation of impdp (Datapump)
+  - run post-datapump fixup tasks, e.g. gather database statistics, apply grants to SYS-owned objects
 
-Logon to SOURCE server as "oracle" software owner or any account belonging to the "dba" group.
 
-Run the migration script in default "ANALYZE" mode to report on relevant migration details, e.g. database size, version, server platform, log mode.
+## SAMPLE MIGRATION
+
+### SOURCE
+
+1. Logon to SOURCE as oracle software owner or member of "dba" group
+2. mkdir /tmp/migrate
+3. cd /tmp/migrate
+4. unzip autoMigrate.zip
+5. export ORACLE_SID=DB1; . oraenv;   # source database to be migrated
+6. ./runMigration.sh
+  => review details of the database including version, characterset, size of application tablespaces
+7. ./runMigration -m EXECUTE
+  => note the "./runMigration.sh -c -t" command displayed 
+
+
+
 
 ```
 ./runMigration.sh -m ANALYZE -o ORACLE_SID
