@@ -202,7 +202,7 @@ unzip /tmp/autoMigrate.zip
 
 ### Logging
 
-runMigration.sh produces always at least one log file in the installation directory for activities perfromed on the $ORACLE_SID
+runMigration.sh produces always at least one log file in the installation directory for activities performed on the database indicated by $ORACLE_SID
 
 After running on a SOURCE database called for example DB1, a single log file named runMigration.DB1.log is created.
 
@@ -210,12 +210,12 @@ After running on a TARGET database called for example CDB1 where the pdb that is
   - runMigration.CDB1.log
   - runMigration.PDB1.log
 
-In addition, logs are maintained in the "migration_log" table that is held in the following schemas:
+In addition, logs are maintained in the "MIGRATION_LOG" table that is held in the following schemas:
   - MIGRATION19
   - C##MIGRATION
   - PDBADMIN
   
-To simplify management of parallel migrations, the "migration_log" table in C##MIGRATION maintains a summary of progress at PDB level.
+To simplify management of parallel migrations, C##MIGRATION.MIGRATION_LOG maintains a summary of progress at PDB level.
 
 Datapump is only run **AFTER** all data files have been copied. To review progress of data file transfers, particularly of large databases, run the following query:
 
