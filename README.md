@@ -58,7 +58,7 @@ In addition to reducing support costs, upgrading to 19C provides an opportunity 
 
 To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration tasks.
 
-Of course, no single solution can cover every every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated. Adopting a scripted approach, however, ensures each migration is carried out consistently with a minimum of intervention and a maximum of control. 
+Of course, no single solution can cover every migration situation. What do you do if your organization uses Apex, for example? Answer: perform a separate export of Apex workspaces/applications for importing into the target PDB where Apex is pre-configured. Or what do you do if your applications are distributed (i.e. use database links)? Answer: plan the order in which the involved databases are migrated. Adopting a scripted approach, however, ensures each migration is carried out consistently with a minimum of intervention and a maximum of control. 
 
 There are 3 principal methods for migrating NON-CDB to PDB: 1) Golden Gate, 2) Clone/Upgrade/Convert and 3) Datapump 
 
@@ -70,8 +70,10 @@ There are 3 principal methods for migrating NON-CDB to PDB: 1) Golden Gate, 2) C
 
 "runMigration.sh" does the following:
 
+- prepares the source database for migration, checking application tablespace integrity before setting these read only
+- prepares the source database for taking incremental backups if requested
 - creates common user in the target CDB database with least privileges to perform all migration tasks
-- transports data files in a restartable process to save time in the event of network or systems failure
+- restartable data transport to avoid re-work in the event of network or systems failure
 - ensures any endianess conversion is done automatically by using the dbms_file_transfer utility
 - creates the Pluggable Database 
 - integrates all application metadata into the target by using the Full Transportable Database option of Datapump
@@ -121,9 +123,17 @@ In this way, near-synchronous copies of the source application data files are ma
  
 
 # AUTOMIGRATE SCRIPTS
-The migration scripts are included in "autoMigrate.zip" within this repository.
+The migration scripts are included in "autoMigrate.zip" available in this repository and include:
 
-The same script "runMigration.sh" runs on both both SOURCE and TARGET database servers. 
+1. runMigration.sh
+------------------
+Bash shell script that runs on both both SOURCE and TARGET database servers. 
+
+2. pck_migration_src.sql
+------------------------
+PLSQL Package that is compiled on SOURCE server
+
+3. 
 
 When it runs on a CDB database then it processes as a TARGET database; otherwise it processes as a SOURCE database.
 
