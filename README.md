@@ -17,7 +17,8 @@ Upgrading to a new Oracle database version can incur significant cost and disrup
 - all earlier version databases are fast reaching end-of-life incurring significant extra support costs
 - NON-CDB is no longer available as of version 20 having been deprecated since release 12.1
 - each version 19 CDB may now comprise 3 PDBs at no additional cost
-- version 19 enables limited cost-free use of features like in-Memory which can drastically improve query performance
+- Privilege Analysis is free to use in 19C which can signicantly improve security
+- In-Memory (limited to 16GB) is free to use in 19C which can drastically improve query performance
 
 Many organizations that have moved from NON-CDB to CDB have seen massive benefits - e.g. Swiss insurance company Mobiliar runs over 700 PDBs consolidated within 5 CDBs which it is able to upgrade over a weekend. However, a change of this magnitude is widely considered to be a complex, costly undertaking that incurs considerable risk and disruption. 
 
