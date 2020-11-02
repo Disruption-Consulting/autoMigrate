@@ -3,10 +3,9 @@ Utility to consistently migrate NON-CDB Oracle databases to PDB with minimal cos
 
 - uses features only included in the basic Enterprise Edition software license
 - reduces application downtime to a minimum
-- source database versions >  10.1.0.2
-- target database versions >= 19.9
+- migrate database versions >=  10.1.0.2 to 19C (most recent version is 19.9)
 
-Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). The literature refers to the pre-Multitenant database as a NON-CDB, in which a set of application tablespaces is typically managed through a single dedicated instance and related background processes. By contrast, a CDB can "contain" up to 252 independent sets of application tablespaces (PDBs) which it manages through a single instance and set of background processes. In this way, migrating to Multitenant can potentially transform an I.T. organisation's costs and improve efficiency by an order of magnitude. Up to 3 PDBs per version 19 CDB is cost-free - otherwise the full Multitenant option is 3850 USD / year / Processor.
+Oracle's Multitenant architecture improves use of resources by consolidating multiple application databases (PDB) within a single Container Database (CDB). One CDB can "contain" up to 252 PDBs which it manages through a single instance and set of background processes. In this way, migrating to Multitenant can potentially transform an I.T. organisation's costs and improve efficiency by an order of magnitude. Up to 3 PDBs per version 19 CDB is license-free - otherwise the full Multitenant option is 17'500 USD per processor.
 
 
 # OVERVIEW
