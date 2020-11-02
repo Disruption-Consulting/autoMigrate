@@ -117,7 +117,9 @@ In this case, the client's business could afford the approximate 5 hours applica
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
 
-In this way, the application remains  
+In this way, the application is only unavailable for 10 minutes - the time it takes to perform Datapump. 
+
+A more realistic migration scenario would be to set a specific end date for the incremental backup process. This is specified when running the script on the TARGET database, e.g. `./runMigration.sh -e "TO_DATE('19.12.2020','dd.mm.yyyy')" - in this case, incremental backups are taken periodically (default is hourly) until the end date is reached.
  
 
 # AUTOMIGRATE SCRIPTS
@@ -138,20 +140,20 @@ The migration scripts are included in "autoMigrate.zip" available in this reposi
 - PLSQL Package that is compiled on SOURCE server within schema "MIGRATION19"
 - Entry points in this package are called by runMigration.sh to:
   - report on database properties that are relevant to the migration
-  - execute the migration by setting application tablespaces to read only
-  - prepare database for taking incremental backups if requested
+  - set application tablespaces to read only
+  - take incremental backups
 
 
 ## pck_migration_cdb.sql
 
 PLSQL Package that is compiled on TARGET server within common user "C##MIGRATION"
 Entry points in this package are called by runMigration.sh to:
-  - manage the data file transfer process from SOURCE to TARGET destination directory
-  - recognize when all application tablespaces have been set read only to trigger datapump phase
-  - automatically apply incremental backup pieces to local level 0 file copies
+  - manage the data file transfer process from SOURCE to TARGET
+  - call pck_migration_src to set tablespaces read only 
+  - apply incremental backup pieces to local level 0 file copies
 
-4. pck_migration_pdb.sql
-------------------------
+## pck_migration_pdb.sql
+
 PLSQL Package that is compiled on TARGET server within the "PDBADMIN" schema that is created with the PDB
 Entry points in this package are called by runMigration.sh to:
   - generate appropriate parfiles for operation of impdp (Datapump)
