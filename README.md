@@ -55,7 +55,7 @@ Full details of what is included in the various support levels are published at 
 
 In addition to reducing support costs, upgrading to 19C provides an opportunity to signicantly reduce infrastructure costs. It is certainly possible, with good planning, to obtain the same or even greater overall performance on much reduced infrastructure since the Multitenant architecture is predicated on sharing computer resources. As commercial software moves increasingly to a core-based cost model it becomes ever more important to run applications on right-sized infrastructure.
 
-# AUTOMIGATE UTILITY
+# AUTOMIGRATE UTILITY
 
 To help migrate from NON-CDB to PDB, the "autoMigrate" utility provides an adaptable framework for coordinating the large number of tasks involved and reducing the exercise to a minimum of interventions. Organizations running hundreds of databases would spend far too much, take far too long and incur considerable risk by using a manual step-by-step migration approach. "autoMigrate" is a shell script called "runMigration.sh" and supporting PLSQL that is run once on each of the source and target databases; it determines the optimal migration method based on source database version and automatically executes the required data transfer, metadata integration and post-migration tasks.
 
@@ -119,7 +119,7 @@ In this case, the client's business could afford the approximate 5 hours applica
 
 In this way, the application is only unavailable for 10 minutes - the time it takes to perform Datapump. 
 
-A more realistic migration scenario would be to set a specific end date for the incremental backup process. This is specified when running the script on the TARGET database, e.g. `./runMigration.sh -e "TO_DATE('19.12.2020','dd.mm.yyyy')" - in this case, incremental backups are taken periodically (default is hourly) until the end date is reached.
+A more realistic migration scenario would be to set a specific end date for the incremental backup process. This is specified when running the script on the TARGET database, e.g. `./runMigration.sh -e "TO_DATE('19.12.2020','dd.mm.yyyy')"` - in this case, incremental backups are taken periodically (default is hourly) until the end date is reached.
  
 
 # AUTOMIGRATE SCRIPTS
