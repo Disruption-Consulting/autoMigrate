@@ -100,27 +100,27 @@ A recent migration of a 500GB database running on 11.2.0.4 on AIX over a network
 |:no_entry:|TOTAL **5 hours 12 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
-In this case, the client's business could afford the approximate 5 hours application downtime, which starts unavoidably as soon as the source database application tablespaces are set to read only. In cases where the database is critical to business operations, a much shorter period of downtime will be required. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database. The same 500GB database could have been migrated using this method as follows:
+In this case, the client's business could afford the approximate 5 hours application downtime, which starts unavoidably as soon as the source database application tablespaces are set to read only. In cases where the database is critical to business operations, a much shorter period of downtime will be required. For this reason, autoMigrate allows the application to remain fully available whilst regular incremental backups are taken and applied to the target database rolling it forward to near-synchronicity with the source database. The same 500GB database is migrated using this method by specifying a backup directory, e.g. `-b /bkp` when running the script on the source database.
 
 
 |APPLICATION AVAILABLE|ELAPSED TIME|SOURCE DATABASE|TARGET DATABASE|
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
-|:white_check_mark:||`./runMigration -i`||
+|:white_check_mark:||`./runMigration -b /bkp`||
 |:white_check_mark:||**BACKUP LVL=0**|`./runMigration`|
 |:white_check_mark:|||**CREATE PDB**|
 |:white_check_mark:|||**TRANSFER LVL=0**|
 |:white_check_mark:||**BACKUP LVL=1** :repeat:|**TRANSFER LVL=1 & ROLL FORWARD** :repeat:|
-|:white_check_mark:|TOTAL: **24 hours**|||
+|:white_check_mark:|TOTAL: **5 hours 30 minutes**|||
 |:no_entry:||`./runMigration -m EXECUTE`||
 |:no_entry:|1 minute|**BACKUP LVL=1 FINAL**||
 |:no_entry:|1 minute||**TRANSFER LVL=1 & ROLL FORWARD FINAL**|
 |:no_entry:|10 mins||**RUN DATAPUMP**|
-|:no_entry:|TOTAL: **12 minutes**|||
+|:no_entry:|TOTAL: **10 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
 
 
-In this way, near-synchronous copies of the source application data files are maintained on the target database until the business decides to complete the migration by running `./runMigration -m EXECUTE` at which point the application tablespaces are set read only before a final incremental backup is taken and applied. From there the migration proceeds in exactly the same way resulting in only 12 minutes application downtime.   
+In this way, the application remains  
  
 
 # AUTOMIGRATE SCRIPTS
