@@ -107,14 +107,11 @@ In this case, the client's business could afford the approximate 5 hours applica
 |:---:|--|--|--|
 |:white_check_mark:||**START MIGRATION**||
 |:white_check_mark:||`./runMigration -b /bkp`||
-|:white_check_mark:||**BACKUP LVL=0**|`./runMigration`|
-|:white_check_mark:|||**CREATE PDB**|
-|:white_check_mark:|||**TRANSFER LVL=0**|
-|:white_check_mark:||**BACKUP LVL=1** :repeat:|**TRANSFER LVL=1 & ROLL FORWARD** :repeat:|
-|:white_check_mark:|TOTAL: **5 hours 30 minutes**|||
-|:no_entry:||`./runMigration -m EXECUTE`||
-|:no_entry:|1 minute|**BACKUP LVL=1 FINAL**||
-|:no_entry:|1 minute||**TRANSFER LVL=1 & ROLL FORWARD FINAL**|
+|:white_check_mark:|1 minute|**BACKUP LVL=0**|`./runMigration`|
+|:white_check_mark:|1 minute||**CREATE PDB**|
+|:white_check_mark:|5 hours||**TRANSFER LVL=0**|
+|:white_check_mark:|5 minutes|**BACKUP LVL=1**|**TRANSFER LVL=1 & ROLL FORWARD**|
+|:white_check_mark:|TOTAL: **5 hours 7 minutes**|||
 |:no_entry:|10 mins||**RUN DATAPUMP**|
 |:no_entry:|TOTAL: **10 minutes**|||
 |:white_check_mark:|||**MIGRATION COMPLETE**|
