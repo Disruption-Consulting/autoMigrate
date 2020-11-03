@@ -4,7 +4,7 @@ V19 is the current terminal release of Oracle Database, providing Premier suppor
 
 See "My Oracle Support" (MOS) Doc ID 742060.1 for the most up-to-date release information.
 
-To upgrade existing V19 ORACLE_HOME and database(s) see https://mikedietrichde.com/2020/10/22/patching-all-my-environments-with-the-october-2020-patch-bundles/
+To upgrade an existing V19 ORACLE_HOME and database(s) see https://mikedietrichde.com/2020/10/22/patching-all-my-environments-with-the-october-2020-patch-bundles/
 
 PROCESS OVERVIEW
 ----------------
