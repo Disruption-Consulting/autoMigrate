@@ -11,7 +11,7 @@ To upgrade an existing V19 ORACLE_HOME and database(s) see https://mikedietrichd
 1. Download Oracle v19 software from MOS
 2. Create new v19 home directory and unzip downloaded v19 zip file
 3. Download latest OPatch utility and replace in v19 home
-4. Download 19.9 patchset and install (this is the latest patchset issued October 2020)
+4. Download 19.9 patchset and install
 5. Create a v19.9 Container Database (CDB) with "dbca" from the new Oracle home
 
 
@@ -77,7 +77,7 @@ opatch version
 Version should return "OPatch Version: 12.2.0.1.21"
 
 
-## 4. Download 19.9 patchset and install (this is the latest patchset issued October 2020)
+## 4. Download 19.9 patchset and install
 
 ```
 cd /tmp
@@ -102,7 +102,7 @@ dbca -silent -createDatabase \
 -systemPassword Dogface34 \
 -createAsContainerDatabase true \
 -databaseType MULTIPURPOSE \
--totalMemory 1500 \
+-totalMemory 3000 \
 -automaticMemoryManagement false \
 -datafileDestination '/u02/oradata' \
 -redoLogFileSize 50 \
