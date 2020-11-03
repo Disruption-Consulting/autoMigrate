@@ -6,8 +6,8 @@ See "My Oracle Support" (MOS) Doc ID 742060.1 for the most up-to-date release in
 
 To upgrade an existing V19 ORACLE_HOME and database(s) see https://mikedietrichde.com/2020/10/22/patching-all-my-environments-with-the-october-2020-patch-bundles/
 
-PROCESS OVERVIEW
-----------------
+# PROCESS OVERVIEW
+
 1. Download Oracle v19 software from MOS
 2. Create new v19 home directory and unzip downloaded v19 zip file
 3. Download latest OPatch utility and replace in v19 home
@@ -15,8 +15,8 @@ PROCESS OVERVIEW
 5. Create a v19.9 Container Database (CDB) with "dbca" from the new Oracle home
 
 
-1. Download software packages from MOS
---------------------------------------
+## 1. Download Oracle v19 software from MOS
+
 You will need to download from MOS the following 3 files into your install directory (assume "/tmp") for your environment (assume "Linux x86_64"):
 
 a) LINUX.X64_193000_db_home.zip - https://www.oracle.com/database/technologies/oracle-database-software-downloads.html#19c
