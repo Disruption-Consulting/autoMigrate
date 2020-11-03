@@ -21,16 +21,16 @@ You will need to download from MOS the following 3 files into your install direc
 
 a) LINUX.X64_193000_db_home.zip - https://www.oracle.com/database/technologies/oracle-database-software-downloads.html#19c
 
-b) Opatch utility - 6880880 - https://support.oracle.com
+b) Opatch utility - 6880880 - https://updates.oracle.com/ARULink/PatchDetails/process_form?patch_num=6880880
 
-c) Release Update - 31771877 - https://support.oracle.com
+c) Release Update - 31771877 - hhttps://support.oracle.com/epmos/faces/ui/patch/PatchDetail.jspx?parent=DOCUMENT&sourceId=2694898.1&patchId=31771877
 
-You also need an install response file (e.g. "db_install.rsp" in this Git repository)
+You also need an install response file (e.g. "db_install.rsp" in this GitHub repository)
 
 
-2. Create v19 home directory
-----------------------------
-Logon or sudo as "oracle" software owner. Shutdown any running instance(s).
+## 2. Create new v19 home directory and unzip downloaded v19 zip file
+
+Logon or sudo as "oracle" software owner. Shutdown listener and any running instance(s).
 
 Edit as necessary the installation response file in /tmp/db_install.rsp
 
@@ -61,9 +61,8 @@ After some minutes the software will be installed. You should then log on as roo
 /u01/app/oracle/product/19.0.0/dbhome_1/root.sh
 ```
 
+## 3. Download latest OPatch utility and replace in v19 home
 
-3. Replace OPatch 
------------------
 Set ORACLE_HOME to the new home directory and set PATH to include OPatch directory before replacing OPatch.
 
 ```
@@ -78,8 +77,8 @@ opatch version
 Version should return "OPatch Version: 12.2.0.1.21"
 
 
-4. Upgrade to v19.9
--------------------
+## 4. Download 19.9 patchset and install (this is the latest patchset issued October 2020)
+
 ```
 cd /tmp
 unzip p31771877_190000_Linux-x86-64.zip
@@ -90,8 +89,8 @@ $ORACLE_HOME/OPatch/opatch apply
 Answer "yes" when prompted and wait until returns "OPatch succeeded".
 
 
-5. Create v19.8 Database (sample)
-------------------------
+## Create a v19.9 Container Database (CDB) with "dbca" from the new Oracle home
+
 ```
 dbca -silent -createDatabase \
 -templateName General_Purpose.dbc \
@@ -124,8 +123,8 @@ exit
 ```
 
 
-Note on Switching homes (LINUX)
--------------------------------
+### Note on Switching homes (LINUX)
+
 Easily accessing multiple Oracle databases built from different homes on the same server can be achieved by configuring functions in the "oracle" account's ".bashrc" file.
 
 For example, if you have used the "dbac" utility to create a v18 database CDB18 and a v19 database CDB19, then the following functions in ".bashrc" allow easy acesss to both:
